@@ -1,0 +1,63 @@
+# 构建目录
+build/
+install/
+log/
+
+# 编译产物
+*.pyc
+*.pyo
+# *.so 需要libarx_r5_src.so
+# *.o
+__pycache__/
+*.swp
+*~
+.*.swp
+.DS_Store
+
+# pixi环境（如果使用）
+.pixi/
+
+# Python虚拟环境
+venv/
+env/
+*.egg-info/
+
+# IDE和编辑器文件
+.vscode/
+.idea/
+*.code-workspace
+
+# 系统文件
+Thumbs.db
+
+# 日志文件
+*.log
+
+# 临时文件
+*.tmp
+*.temp
+
+# 大文件和数据
+*.bag
+*.h5
+*.hdf5
+*.pcd
+*.pkl
+*.npy
+*.npz
+
+# 个人配置
+.local/
+*.local
+personal_config.yaml
+
+# 文档生成
+docs/_build/
+docs/_out/
+
+# 测试相关
+test_results/
+coverage/
+*.gcda
+*.gcno
+
