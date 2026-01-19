@@ -79,7 +79,7 @@ class VRChassisTorsoControl(Node):
 
         # 速度增益（用于缩放摇杆输入）
         self.torso_speed_gain = 0.5   # 躯干速度增益（降低以提高平滑度）
-        self.chassis_speed_gain = 0.2  # 底盘速度增益（可调小以降低响应速度）
+        self.chassis_speed_gain = 0.1  # 底盘速度增益（可调小以降低响应速度）
         
         # 低通滤波器参数（用于平滑控制）
         self.filter_alpha = 0.3  # 滤波系数：0.0-1.0，越小越平滑（但响应越慢）
@@ -101,7 +101,7 @@ class VRChassisTorsoControl(Node):
         # v_x: [-0.2, 0.2] m/s，但实际范围是 -0.1 ≤ x ≤ 0.2
         self.max_torso_vx = 0.1   # x方向最大速度
         # v_z: [-0.2, 0.2] m/s，但实际范围是 0.1 ≤ z ≤ 0.7（高度范围）
-        self.max_torso_vz = 0.1           # z方向最大速度
+        self.max_torso_vz = 0.15           # z方向最大速度
         self.max_pitch = 0.1              # pitch方向最大速度
 
         # Workspace 估计
