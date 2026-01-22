@@ -3,7 +3,7 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
-from hdas_msg.msg import MotorControl
+from robot_msgs.msg import MotorControl
 from std_msgs.msg import Bool
 import sys
 import time

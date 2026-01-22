@@ -8,9 +8,15 @@ SESSION_NAME="r1lite"
 
 PASSWORD="1"
 
-QUEST_DIR="$HOME/mobile_midea/quest"
-PROTOTYPE_DIR="$HOME/mobile_midea/prototype"
-QUICK_START_DIR="$HOME/mobile_midea/quick_start"
+# 获取脚本所在目录（quick_start 目录）
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# 获取 mobile_midea 根目录（quick_start 的父目录）
+MOBILE_MIDEA_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# 基于根目录设置各模块路径
+QUEST_DIR="$MOBILE_MIDEA_DIR/quest"
+PROTOTYPE_DIR="$MOBILE_MIDEA_DIR/prototype"
+QUICK_START_DIR="$MOBILE_MIDEA_DIR/quick_start"
 
 CONFIG_CAN=true
 START_VR=true
@@ -33,20 +39,24 @@ fi
 tmux new-session -d -s "$SESSION_NAME" -n robot
 
 # ===================== Pane 布局 =====================
-# 0: CAN
-# 1: VR
-# 2: ARM
-# 3: DATA
+# 目标布局：3行2列
+# 左列：CAN(0) | ARM(2) | Camera(4)
+# 右列：VR(1) | DATA(3) | Rviz2(5)
+# 注意：pane编号由split顺序决定
 
-tmux split-window -v -t "$SESSION_NAME:robot"     # 下半
-tmux split-window -h -t "$SESSION_NAME:robot.1"   # 下左 / 下右
-tmux split-window -h -t "$SESSION_NAME:robot.0"   # 上左 / 上右
+# 创建左右两列
+tmux split-window -h -t "$SESSION_NAME:robot"     # 水平分割：0(左), 1(右)
 
-tmux select-pane -t 0
-tmux resize-pane -y 12
+# 左列垂直分割成3行
+tmux split-window -v -t "$SESSION_NAME:robot.0"   # 左列分割：0(左上), 2(左中)
+tmux split-window -v -t "$SESSION_NAME:robot.2"   # 左列再分割：0(左上), 2(左中), 4(左下)
 
-tmux select-pane -t 3
-tmux resize-pane -y 10
+# 右列垂直分割成3行
+tmux split-window -v -t "$SESSION_NAME:robot.1"   # 右列分割：1(右上), 3(右中)
+tmux split-window -v -t "$SESSION_NAME:robot.3"    # 右列再分割：1(右上), 3(右中), 5(右下)
+
+# 调整 pane 大小 - 使用 tiled 布局确保所有面板大小完全一致
+tmux select-layout -t "$SESSION_NAME:robot" tiled
 
 # ===================== galaxea_robot_startup =====================
 tmux send-keys -t "$SESSION_NAME:robot.0" "
@@ -64,13 +74,14 @@ exec bash
 " C-m
 
 # ===================== VR pane =====================
+# 注意：根据split顺序，VR在pane 1（右列上）
 tmux send-keys -t "$SESSION_NAME:robot.1" "
 set +x
 tmux select-pane -T 'VR…'
 cd $QUEST_DIR || exit 1
 
-# 配置 ADB 设备
-bash bash/adb.sh
+# 配置 ADB 设备，如果失败则退出
+bash bash/adb.sh || exit 1
 
 # 启动 VR ROS2 节点
 source install/setup.bash
@@ -79,6 +90,7 @@ pixi run ros2 launch quest3s_vr vr_control.launch.py
 " C-m
 
 # ===================== ARM pane =====================
+# 注意：根据split顺序，ARM在pane 2（左列中）
 tmux send-keys -t "$SESSION_NAME:robot.2" "
 set +x
 tmux select-pane -T 'ARM…'
@@ -94,6 +106,7 @@ pixi run ros2 launch yam_damiao_controller open_vr_double_arm.launch.py
 " C-m
 
 # ===================== DATA_COLLECTOR pane =====================
+# 注意：根据split顺序，DATA在pane 3（右列中）
 tmux send-keys -t "$SESSION_NAME:robot.3" "
 set +x
 tmux select-pane -T 'DATA_COLLECTOR'
@@ -102,6 +115,32 @@ cd $PROTOTYPE_DIR || exit 1
 # 启动 DATA_COLLECTOR 节点
 source install/setup.bash
 pixi run ros2 launch data_collector data_collector.launch.py
+
+" C-m
+
+# ===================== Camera pane =====================
+# 注意：根据split顺序，Camera在pane 4（左列下，高度较小）
+tmux send-keys -t "$SESSION_NAME:robot.4" "
+set +x
+tmux select-pane -T 'CAMERA'
+cd $PROTOTYPE_DIR || exit 1
+
+# 启动 UVC cameras
+source install/setup.bash
+./scripts/uvc_cameras.py
+
+" C-m
+
+# ===================== Rviz2 pane =====================
+# 注意：根据split顺序，Rviz2在pane 5（右列下，高度较小）
+tmux send-keys -t "$SESSION_NAME:robot.5" "
+set +x
+tmux select-pane -T 'RVIZ2'
+cd $PROTOTYPE_DIR || exit 1
+
+# 启动 Rviz2
+source install/setup.bash
+rviz2
 
 " C-m
 

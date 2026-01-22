@@ -3,9 +3,9 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 from transforms3d.quaternions import mat2quat
-from quest2_button_msg.msg import Quest2Button
+from robot_msgs.msg import Quest2Button
 from quest3s_vr.controllers import ControllerVuer
-from yam_arm_msg.msg import YamStatus
+from robot_msgs.msg import YamStatus
 from multiprocessing import Array, Process
 from pathlib import Path
 from ament_index_python.packages import get_package_share_directory

@@ -1,8 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped, TransformStamped, TwistStamped
-from quest2_button_msg.msg import Quest2Button
-from yam_arm_msg.msg import YamCmd, YamStatus
+from robot_msgs.msg import Quest2Button, YamCmd, YamStatus
 import numpy as np
 from scipy.spatial.transform import Rotation
 from tf2_ros import TransformBroadcaster

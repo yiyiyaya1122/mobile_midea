@@ -6,7 +6,7 @@ namespace yam
     {
         // tools_ = std::make_unique<InterfacesTools>(0);
         // Create a subscription to the IMU topic
-        joint_state_subscriber_ = this->create_subscription<yam_arm_msg::msg::YamStatus>(
+        joint_state_subscriber_ = this->create_subscription<robot_msgs::msg::YamStatus>(
             "/arm_status", 10, std::bind(&R5Visualization::subArmCallback, this, std::placeholders::_1));
 
         joint_state_publisher_ = this->create_publisher<sensor_msgs::msg::JointState>("/joint_status", 10);
@@ -15,7 +15,7 @@ namespace yam
         timer_ = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&R5Visualization::PubState, this));
     }
 
-    void R5Visualization::subArmCallback(const yam_arm_msg::msg::YamStatus::SharedPtr msg)
+    void R5Visualization::subArmCallback(const robot_msgs::msg::YamStatus::SharedPtr msg)
     {
         for (int i = 0; i < msg->joint_pos.size(); i++)
         {

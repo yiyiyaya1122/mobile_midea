@@ -1,6 +1,6 @@
 std_msgs/Header header
 
-float64[7] end_pose # x y z w x y z
+float64[6] end_pos # x y z r p y
 
 float64[6] joint_pos
 

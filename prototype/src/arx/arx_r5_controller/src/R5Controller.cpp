@@ -30,9 +30,9 @@ R5Controller::R5Controller() : Node("r5_controller_node") {
   if (arm_control_type == "normal") {
     RCLCPP_INFO(this->get_logger(), "常规模式启动");
     // 创建发布器
-    joint_state_publisher_ = this->create_publisher<arx5_arm_msg::msg::RobotStatus>(pub_name, 1);
+    joint_state_publisher_ = this->create_publisher<robot_msgs::msg::RobotStatus>(pub_name, 1);
     // 创建订阅器
-    joint_state_subscriber_ = this->create_subscription<arx5_arm_msg::msg::RobotCmd>(
+    joint_state_subscriber_ = this->create_subscription<robot_msgs::msg::RobotCmd>(
         this->declare_parameter("arm_sub_topic_name", "arm_cmd"),
         10,
         std::bind(&R5Controller::CmdCallback, this, std::placeholders::_1));
@@ -41,11 +41,11 @@ R5Controller::R5Controller() : Node("r5_controller_node") {
   } else if (arm_control_type == "vr_slave") {
     RCLCPP_INFO(this->get_logger(), "vr遥操作模式启动");
     // 创建发布器
-    vr_joint_state_publisher_ = this->create_publisher<arm_control::msg::PosCmd>(pub_name, 10);
+    vr_joint_state_publisher_ = this->create_publisher<robot_msgs::msg::PosCmd>(pub_name, 10);
 
-    joint_state_publisher_ = this->create_publisher<arx5_arm_msg::msg::RobotStatus>(pub_name + "_full", 1);
+    joint_state_publisher_ = this->create_publisher<robot_msgs::msg::RobotStatus>(pub_name + "_full", 1);
     // 创建订阅器
-    vr_joint_state_subscriber_ = this->create_subscription<arm_control::msg::PosCmd>(
+    vr_joint_state_subscriber_ = this->create_subscription<robot_msgs::msg::PosCmd>(
         this->declare_parameter("arm_sub_topic_name", "ARX_VR_L"),
         10,
         std::bind(&R5Controller::VrCmdCallback, this, std::placeholders::_1));
@@ -53,14 +53,14 @@ R5Controller::R5Controller() : Node("r5_controller_node") {
     timer_ = this->create_wall_timer(std::chrono::milliseconds(1), std::bind(&R5Controller::VrPubState, this));
   } else if (arm_control_type == "remote_master") {
     RCLCPP_INFO(this->get_logger(), "remote主机模式启动");
-    joint_state_publisher_ = this->create_publisher<arx5_arm_msg::msg::RobotStatus>(pub_name, 10);
+    joint_state_publisher_ = this->create_publisher<robot_msgs::msg::RobotStatus>(pub_name, 10);
     interfaces_ptr_->setArmStatus(InterfacesThread::state::G_COMPENSATION);
     // 定时器，用于发布关节信息
     timer_ = this->create_wall_timer(std::chrono::milliseconds(1), std::bind(&R5Controller::PubState, this));
   } else if (arm_control_type == "remote_slave") {
     RCLCPP_INFO(this->get_logger(), "remote从机模式启动");
-    joint_state_publisher_ = this->create_publisher<arx5_arm_msg::msg::RobotStatus>(pub_name, 10);
-    follow_joint_state_subscriber_ = this->create_subscription<arx5_arm_msg::msg::RobotStatus>(
+    joint_state_publisher_ = this->create_publisher<robot_msgs::msg::RobotStatus>(pub_name, 10);
+    follow_joint_state_subscriber_ = this->create_subscription<robot_msgs::msg::RobotStatus>(
         this->declare_parameter("arm_sub_topic_name", "followed_arm_topic"),
         10,
         std::bind(&R5Controller::FollowCmdCallback, this, std::placeholders::_1));
@@ -69,7 +69,7 @@ R5Controller::R5Controller() : Node("r5_controller_node") {
   }
 }
 
-void R5Controller::CmdCallback(const arx5_arm_msg::msg::RobotCmd::SharedPtr msg) {
+void R5Controller::CmdCallback(const robot_msgs::msg::RobotCmd::SharedPtr msg) {
   double end_pos[6] =
       {msg->end_pos[0], msg->end_pos[1], msg->end_pos[2], msg->end_pos[3], msg->end_pos[4], msg->end_pos[5]};
 
@@ -91,7 +91,7 @@ void R5Controller::CmdCallback(const arx5_arm_msg::msg::RobotCmd::SharedPtr msg)
 }
 
 void R5Controller::PubState() {
-  auto message = arx5_arm_msg::msg::RobotStatus();
+  auto message = robot_msgs::msg::RobotStatus();
   message.header.stamp = this->get_clock()->now();
 
   Eigen::Isometry3d transform = interfaces_ptr_->getEndPose();
@@ -130,7 +130,7 @@ void R5Controller::PubState() {
   joint_state_publisher_->publish(message);
 }
 
-void R5Controller::VrCmdCallback(const arm_control::msg::PosCmd::SharedPtr msg) {
+void R5Controller::VrCmdCallback(const robot_msgs::msg::PosCmd::SharedPtr msg) {
   // RCLCPP_INFO(this->get_logger(), "接收到数据");
   double input[6] = {msg->x, msg->y, msg->z, msg->roll, msg->pitch, msg->yaw};
   Eigen::Isometry3d transform = solve::Xyzrpy2Isometry(input);
@@ -144,7 +144,7 @@ void R5Controller::VrCmdCallback(const arm_control::msg::PosCmd::SharedPtr msg) 
 
 void R5Controller::VrPubState() {
   // RCLCPP_INFO(this->get_logger(), "发布数据");
-  auto message = arm_control::msg::PosCmd();
+  auto message = robot_msgs::msg::PosCmd();
   // message.header.stamp = this->get_clock()->now();
 
   Eigen::Isometry3d transform = interfaces_ptr_->getEndPose();
@@ -178,7 +178,7 @@ void R5Controller::VrPubState() {
   vr_joint_state_publisher_->publish(message);
 
   //==========================================================
-  auto msg = arx5_arm_msg::msg::RobotStatus();
+  auto msg = robot_msgs::msg::RobotStatus();
   msg.header.stamp = this->get_clock()->now();
 
   // 创建长度为6的vector
@@ -209,7 +209,7 @@ void R5Controller::VrPubState() {
   joint_state_publisher_->publish(msg);
 }
 
-void R5Controller::FollowCmdCallback(const arx5_arm_msg::msg::RobotStatus::SharedPtr msg) {
+void R5Controller::FollowCmdCallback(const robot_msgs::msg::RobotStatus::SharedPtr msg) {
   std::vector<double> target_joint_position(6, 0.0);
 
   for (int i = 0; i < 6; i++) {

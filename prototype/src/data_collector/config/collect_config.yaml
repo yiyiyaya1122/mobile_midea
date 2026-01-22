@@ -1,14 +1,11 @@
 
-#data_dir: "/media/midea/Extreme SSD/random_folding_shirts_basket_1folded_dyna_sj_20251021"
-#data_dir: "/media/midea/Extreme SSD/ltt/random_folding_pants_wooden_basket_0folded_flip_sj_20251028"
-#data_dir: "/home/midea/folding_shirts_wooden_basket_ltt_20251225"
-# data_dir: "/home/midea/random_folding_blouse_basket_0folded_ltt_20260106"
-#data_dir: "/home/midea/random_folding_shirts_wooden_basket_0folded_xdyna_ltt_20251217"
-#data_dir: "//media/midea/EAI-29/lt/random_folding_shirts_wooden_basket_1folded_xdyna3_ltt_20251121"
-#data_dir: "/media/midea/Extreme SSD/jjx/random_folding_shirts_basket_1folded_jjx_20251016_prac"
-#data_dir: "/media/midea/eai-22/random_folding_shirts_basket_2folded_xdyna_tuoguan_zjx_20251202"
-data_dir: "/home/r1lite/GalaxeaDataset/20260112"
+# data_dir 可以设置为具体路径，或使用 "auto" 自动创建日期目录
+# 如果设置为 "auto" 或空字符串，将在 base_dir 下创建当前日期目录 (格式: YYYYMMDD)
+data_dir: "auto"
 
+# base_dir: 当 data_dir 为 "auto" 时，数据将保存在此基础目录下的日期子目录中
+# 默认值: /home/r1lite/GalaxeaDataset
+base_dir: "/home/r1lite/GalaxeaDataset"
 
 max_queue_size: 5
 max_age: 0.5
@@ -109,27 +106,28 @@ datasets:
       dtype: "float64"
       description: "Right arm joint current"
 
-  # "/state/base_vel":
-  #   topic: "/odom"
-  #   processor: "data_collector.data_processor.OdomProcessor"
-  #   processor_config:
-  #     output_shape: [6]
-  #     dtype: "float64"
-  #     description: "Base velocity (angular xyz + linear xyz)"
+  "/state/chassis_vel":
+    topic: "/motion_target/target_speed_chassis"
+    processor: "data_collector.data_processor.OdomProcessor"
+    processor_config:
+      output_shape: [6]
+      dtype: "float64"
+      description: "Chassis velocity (angular xyz + linear xyz)"
 
-  # "/action/base_vel":
-  #   topic: "/cmd_vel"
-  #   processor: "data_collector.data_processor.TwistProcessor"
-  #   processor_config:
-  #     output_shape: [6]
-  #     dtype: "float64"
-  #     description: "Base velocity command (angular xyz + linear xyz)"
+  "/state/torso_vel":
+    topic: "/motion_target/target_speed_torso"
+    processor: "data_collector.data_processor.TwistProcessor"
+    processor_config:
+      output_shape: [6]
+      dtype: "float64"
+      description: "Torso velocity (angular xyz + linear xyz)"
 
 
 topics:
-  "/pedal_status":
-    msg_type: "sensor_msgs.msg.Joy"
-    description: "Pedal input device"
+
+  # "/pedal_status":
+  #   msg_type: "sensor_msgs.msg.Joy"
+  #   description: "Pedal input device"
 
   "/cam_right_wrist/color/image_rect_raw":
     msg_type: "sensor_msgs.msg.Image"
@@ -168,17 +166,17 @@ topics:
   #   description: "Top-mounted D457 pointcloud"
 
   "/arm_l_status":
-    msg_type: "yam_arm_msg.msg.YamStatus"
+    msg_type: "robot_msgs.msg.YamStatus"
     description: "Left arm status"
 
   "/arm_r_status":
-    msg_type: "yam_arm_msg.msg.YamStatus"
+    msg_type: "robot_msgs.msg.YamStatus"
     description: "Right arm status"
 
-  "/odom":
-    msg_type: "nav_msgs.msg.Odometry"
-    description: "Base odometry"
-
-  "/cmd_vel":
+  "/motion_target/target_speed_chassis":
     msg_type: "geometry_msgs.msg.TwistStamped"
-    description: "Base velocity commands"
+    description: "Chassis velocity"
+
+  "/motion_target/target_speed_torso":
+    msg_type: "geometry_msgs.msg.TwistStamped"
+    description: "Torso velocity"

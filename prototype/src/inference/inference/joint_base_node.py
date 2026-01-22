@@ -2,8 +2,7 @@ import time
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped, TwistStamped
-from arx5_arm_msg.msg import RobotCmd, RobotStatus
-from yam_arm_msg.msg import YamCmd, YamStatus
+from robot_msgs.msg import RobotCmd, RobotStatus, YamCmd, YamStatus
 from nav_msgs.msg import Odometry
 from std_srvs.srv import Trigger
 import numpy as np

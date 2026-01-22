@@ -9,12 +9,11 @@
 
   <exec_depend>rclpy</exec_depend>
   <exec_depend>tf_transformations</exec_depend>
-  <exec_depend>quest2_button_msg</exec_depend>
+  <exec_depend>robot_msgs</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>vuer</exec_depend>
   <exec_depend>numpy</exec_depend>
-  <exec_depend>hdas_msg</exec_depend>
   <exec_depend>std_msgs</exec_depend>
 
   <export>

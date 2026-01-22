@@ -5,9 +5,9 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
-find_package(arm_control REQUIRED)
-find_package(arx5_arm_msg REQUIRED)
+find_package(robot_msgs REQUIRED)
 
 find_package(tf2_msgs REQUIRED)
 find_package(tf2 REQUIRED)
@@ -27,16 +27,16 @@ set(OROCOS_LIB ${CMAKE_CURRENT_SOURCE_DIR}/lib/arx_r5_src/liborocos-kdl.so.1.5)
 add_executable(R5Controller src/R5Controller.cpp)
 target_include_directories(R5Controller PUBLIC lib/arx_hardware_interface/include lib/arx_r5_src/include)
 target_link_libraries(R5Controller ${DEPEND_LIB} ${OROCOS_LIB})
-ament_target_dependencies(R5Controller rclcpp ament_index_cpp std_msgs arx5_arm_msg arm_control tf2 tf2_msgs)
+ament_target_dependencies(R5Controller rclcpp ament_index_cpp std_msgs robot_msgs tf2 tf2_msgs)
 
 # 添加可执行文件
 add_executable(R5Visualization src/R5Visualization.cpp)
 target_include_directories(R5Visualization PUBLIC lib/arx_hardware_interface/include lib/arx_r5_src/include)
 target_link_libraries(R5Visualization ${DEPEND_LIB} ${OROCOS_LIB})
-ament_target_dependencies(R5Visualization rclcpp std_msgs arx5_arm_msg arm_control tf2 tf2_msgs)
+ament_target_dependencies(R5Visualization rclcpp std_msgs sensor_msgs robot_msgs tf2 tf2_msgs)
 
 add_executable(KeyBoard src/KeyBoard.cpp)
-ament_target_dependencies(KeyBoard rclcpp std_msgs arx5_arm_msg)
+ament_target_dependencies(KeyBoard rclcpp std_msgs robot_msgs)
 
 install(TARGETS
     R5Controller

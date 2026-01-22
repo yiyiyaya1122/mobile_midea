@@ -7,8 +7,7 @@ VR手柄摇杆控制机器人torso节点
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
-from quest2_button_msg.msg import Quest2Button
-from hdas_msg.msg import MotorControl
+from robot_msgs.msg import Quest2Button, MotorControl
 from std_msgs.msg import Bool
 import numpy as np
 

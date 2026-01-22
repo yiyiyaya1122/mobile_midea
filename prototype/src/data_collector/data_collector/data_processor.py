@@ -2,10 +2,7 @@ from typing import Dict, Any, List
 from cv_bridge import CvBridge
 import numpy as np
 import cv2
-from arx5_arm_msg.msg import RobotCmd
-from arx5_arm_msg.msg import RobotStatus
-from yam_arm_msg.msg import YamCmd
-from yam_arm_msg.msg import YamStatus
+from robot_msgs.msg import RobotCmd, RobotStatus, YamCmd, YamStatus
 from geometry_msgs.msg import Twist
 
 class DataProcessor:
@@ -89,19 +86,19 @@ class JointCurrentProcessor(DataProcessor):
 
 class TwistProcessor(DataProcessor):
     def process(self, msg):
-
-        angular_linear = [msg.twist.angular.x, msg.twist.angular.y, msg.twist.angular.z, msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z]
-
+        # TwistStamped structure: header + twist (Twist type)
+        # Twist structure: linear (Vector3) + angular (Vector3)
+        twist = msg.twist
+        angular_linear = [twist.angular.x, twist.angular.y, twist.angular.z, twist.linear.x, twist.linear.y, twist.linear.z]
         return np.array(angular_linear)
 
 
 class OdomProcessor(DataProcessor):
     def process(self, msg):
-
-        twist = msg.twist.twist
-
-        angular_linear = [twist.angular.x, twist.angular.y, twist.angular.z,twist.linear.x, twist.linear.y, twist.linear.z]
-
+        # TwistStamped structure: header + twist (Twist type)
+        # Twist structure: linear (Vector3) + angular (Vector3)
+        twist = msg.twist
+        angular_linear = [twist.angular.x, twist.angular.y, twist.angular.z, twist.linear.x, twist.linear.y, twist.linear.z]
         return np.array(angular_linear)
 
 

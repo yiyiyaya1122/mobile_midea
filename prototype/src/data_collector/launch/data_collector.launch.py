@@ -25,11 +25,12 @@ def generate_launch_description():
             }]
         ),
 
-        # Second node configuration
-        Node(
-            package='data_collector',
-            executable='pedal_pub',
-            name='pedal_pub',  # Unique node name
-            output='screen',
-        )
+        # Second node configuration (pedal_pub requires X server)
+        # Commented out by default - uncomment if running in an environment with X server
+        # Node(
+        #     package='data_collector',
+        #     executable='pedal_pub',
+        #     name='pedal_pub',  # Unique node name
+        #     output='screen',
+        # )
     ])

@@ -14,7 +14,7 @@ from enum import Enum
 
 from geometry_msgs.msg import TwistStamped
 from std_msgs.msg import Bool
-from quest2_button_msg.msg import Quest2Button
+from robot_msgs.msg import Quest2Button
 
 
 # =========================

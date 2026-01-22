@@ -8,9 +8,9 @@ namespace arx::r5
 {
     KeyBoardNode::KeyBoardNode() : Node("keyboard_node")
     {
-        joint_cmd_publisher_ = this->create_publisher<arx5_arm_msg::msg::RobotCmd>("arm_cmd", 1);
+        joint_cmd_publisher_ = this->create_publisher<robot_msgs::msg::RobotCmd>("arm_cmd", 1);
 
-        joint_status_subscriber_ = this->create_subscription<arx5_arm_msg::msg::RobotStatus>(
+        joint_status_subscriber_ = this->create_subscription<robot_msgs::msg::RobotStatus>(
             "arm_status", 1, std::bind(&KeyBoardNode::getEndPoseCallBack, this, std::placeholders::_1));
 
         timer_ = this->create_wall_timer(std::chrono::milliseconds(1), std::bind(&KeyBoardNode::Update, this));
@@ -194,7 +194,7 @@ namespace arx::r5
         return in;
     }
 
-    void KeyBoardNode::getEndPoseCallBack(const arx5_arm_msg::msg::RobotStatus::SharedPtr msg)
+    void KeyBoardNode::getEndPoseCallBack(const robot_msgs::msg::RobotStatus::SharedPtr msg)
     {
         for (size_t i = 0; i < 6; i++)
         {

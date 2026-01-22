@@ -6,8 +6,8 @@
 #include <array>
 #include <vector>
 
-#include "yam_arm_msg/msg/yam_cmd.hpp"
-#include "yam_arm_msg/msg/yam_status.hpp"
+#include "robot_msgs/msg/yam_cmd.hpp"
+#include "robot_msgs/msg/yam_status.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
 #include <tf2_ros/transform_broadcaster.h>
 #include <geometry_msgs/msg/transform_stamped.hpp>
@@ -37,7 +37,7 @@ public:
     void robot_init();
 
     // Command callback
-    void cmdCallback(const yam_arm_msg::msg::YamCmd::SharedPtr msg);
+    void cmdCallback(const robot_msgs::msg::YamCmd::SharedPtr msg);
 
     // State publishing
     void publishState();
@@ -134,9 +134,9 @@ private:
     double dt_ = 0.001;  // control period
 
     // Publishers and subscribers
-    rclcpp::Publisher<yam_arm_msg::msg::YamStatus>::SharedPtr robot_status_publisher_;
+    rclcpp::Publisher<robot_msgs::msg::YamStatus>::SharedPtr robot_status_publisher_;
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr rviz_joint_state_publisher_;
-    rclcpp::Subscription<yam_arm_msg::msg::YamCmd>::SharedPtr robot_cmd_subscriber_;
+    rclcpp::Subscription<robot_msgs::msg::YamCmd>::SharedPtr robot_cmd_subscriber_;
     rclcpp::TimerBase::SharedPtr control_timer_;  // Timer for control loop
     rclcpp::TimerBase::SharedPtr state_timer_;  // Timer for pub state
 

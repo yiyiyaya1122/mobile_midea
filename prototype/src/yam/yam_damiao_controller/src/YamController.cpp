@@ -66,7 +66,7 @@ namespace yam {
 
 		// Setup publishers/subscribers/timers
 		if (arm_control_type == "normal") {
-			robot_status_publisher_ = this->create_publisher<yam_arm_msg::msg::YamStatus>(
+			robot_status_publisher_ = this->create_publisher<robot_msgs::msg::YamStatus>(
 				this->declare_parameter("arm_pub_topic_name", "arm_status"), 1);
 
 			state_timer_ = this->create_wall_timer(std::chrono::milliseconds(3), 
@@ -80,7 +80,7 @@ namespace yam {
 				std::bind(&YamController::controlLoop, this));
 			RCLCPP_INFO(this->get_logger(), "Robot ControlLoop created!");
 
-			robot_cmd_subscriber_ = this->create_subscription<yam_arm_msg::msg::YamCmd>(
+			robot_cmd_subscriber_ = this->create_subscription<robot_msgs::msg::YamCmd>(
 				this->declare_parameter("arm_sub_topic_name", "arm_cmd"), 1,
 				std::bind(&YamController::cmdCallback, this, std::placeholders::_1));
 			RCLCPP_INFO(this->get_logger(), "Robot Cmd Sub created!");
@@ -136,7 +136,7 @@ namespace yam {
 		current_state_ = new_state;
 	}
 
-  void YamController::cmdCallback(const yam_arm_msg::msg::YamCmd::SharedPtr msg) {
+  void YamController::cmdCallback(const robot_msgs::msg::YamCmd::SharedPtr msg) {
 
     if (current_state_ != ArmState::SOFT && current_state_ != ArmState::INIT){
       // Map message modes to state machine states
@@ -513,7 +513,7 @@ namespace yam {
         gripper_velocities_ = interfaces_ptr_damiao_->getGripperVelocities();
         gripper_torques_ = interfaces_ptr_damiao_->getGripperCurrent();
 
-        auto robot_status_msg = yam_arm_msg::msg::YamStatus();
+        auto robot_status_msg = robot_msgs::msg::YamStatus();
         robot_status_msg.header.stamp = this->get_clock()->now();
 
         Eigen::VectorXd q(6);

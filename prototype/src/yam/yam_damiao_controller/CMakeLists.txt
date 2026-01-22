@@ -12,7 +12,7 @@ find_package(ament_index_cpp REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
-find_package(yam_arm_msg REQUIRED)
+find_package(robot_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf2_msgs REQUIRED)
 find_package(tf2 REQUIRED)
@@ -48,7 +48,7 @@ ament_target_dependencies(YamController
 rclcpp 
 ament_index_cpp 
 std_msgs 
-yam_arm_msg
+robot_msgs
 tf2 
 tf2_msgs 
 sensor_msgs 

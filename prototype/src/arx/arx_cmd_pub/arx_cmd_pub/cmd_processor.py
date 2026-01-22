@@ -3,8 +3,7 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
-from quest2_button_msg.msg import Quest2Button
-from arx5_arm_msg.msg import RobotCmd, RobotStatus
+from robot_msgs.msg import Quest2Button, RobotCmd, RobotStatus
 
 import numpy as np
 from tf_transformations import quaternion_from_matrix, quaternion_multiply, quaternion_from_euler, euler_from_quaternion, quaternion_matrix, euler_from_matrix

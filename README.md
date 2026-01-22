@@ -17,6 +17,15 @@ mobile_midea 是一个基于 ROS 2 的高性能机器人数据收集与控制系
 
 ```
 mobile_midea/
+├── robot_msgs/                   # 共享消息定义包（ROS 2 包）
+│   ├── msg/                      # 消息定义文件
+│   │   ├── arx/                  # ARX 机械臂消息
+│   │   ├── yam/                  # YAM 机械臂消息
+│   │   ├── quest/                # Quest VR 消息
+│   │   └── galaxea/              # Galaxea 底盘消息
+│   ├── CMakeLists.txt
+│   ├── package.xml
+│   └── README.md
 ├── prototype/                    # 主控制模块（ROS 2 工作空间）
 │   ├── bash/                     # 系统脚本和启动脚本
 │   ├── CAN/                      # CAN 总线配置（统一目录结构）
@@ -30,7 +39,7 @@ mobile_midea/
 │   │   ├── yam/                  # YAM 设备相关包
 │   │   ├── data_collector/       # 数据收集模块
 │   │   ├── inference/            # 推理模块
-│   │   ├── msg/                  # 自定义 ROS 2 消息定义
+│   │   ├── robot_msgs -> ../../robot_msgs  # 符号链接到共享消息包
 │   │   └── rs_cameras/           # RealSense 摄像头驱动
 │   ├── build/                    # 构建输出目录
 │   ├── install/                  # 安装目录
@@ -44,7 +53,7 @@ mobile_midea/
 │   │   ├── quest3s_vr/           # Quest3S VR 主包
 │   │   ├── yam_description/       # YAM 机械臂描述文件
 │   │   ├── arx_description/      # ARX 机械臂描述文件
-│   │   └── msg/                  # 自定义消息定义
+│   │   └── robot_msgs -> ../../robot_msgs  # 符号链接到共享消息包
 │   ├── build/                    # 构建输出目录
 │   ├── install/                  # 安装目录
 │   └── README.md                 # 详细文档
@@ -55,6 +64,17 @@ mobile_midea/
 ```
 
 ## 主要模块说明
+
+### robot_msgs/ - 共享消息定义包
+统一的 ROS 2 消息定义包，包含所有机器人接口的消息类型：
+- **ARX 消息**：`RobotCmd`、`RobotStatus`、`PosCmd`
+- **YAM 消息**：`YamCmd`、`YamStatus`
+- **Quest VR 消息**：`Quest2Button`
+- **Galaxea 消息**：`MotorControl`
+
+该包通过符号链接同时存在于 `prototype` 和 `quest` 工作空间中，确保消息定义的一致性。
+
+详细文档请参考：[robot_msgs/README.md](robot_msgs/README.md)
 
 ### prototype/ - 主控制模块
 包含完整的机器人控制系统：
@@ -159,20 +179,31 @@ pixi install
 
 ## 构建项目
 
-安装完依赖后，需要分别构建各个子模块：
+安装完依赖后，需要分别构建各个子模块。`robot_msgs` 包已通过符号链接添加到 `prototype` 和 `quest` 工作空间中，`colcon` 会自动处理依赖关系，先编译 `robot_msgs`：
 
 ```bash
-# 构建 prototype 模块
+# 构建 prototype 模块（会自动先编译 robot_msgs）
 cd prototype
 pixi shell
 colcon build --symlink-install
 source install/setup.bash
 
-# 构建 quest 模块
+# 构建 quest 模块（会自动先编译 robot_msgs）
 cd ../quest
 pixi shell
 colcon build --symlink-install
 source install/setup.bash
+```
+
+**注意**：如果 `robot_msgs` 符号链接不存在，可以手动创建：
+```bash
+# 在 prototype 工作空间
+cd prototype/src
+ln -sf ../../robot_msgs robot_msgs
+
+# 在 quest 工作空间
+cd quest/src
+ln -sf ../../robot_msgs robot_msgs
 ```
 
 # 使用说明
@@ -331,18 +362,29 @@ source install/setup.bash
 
 ## 构建特定包
 
-在开发过程中，可以只构建特定的包以节省时间：
+在开发过程中，可以只构建特定的包以节省时间。如果包依赖于 `robot_msgs`，建议先编译 `robot_msgs`：
 
 ```bash
 # prototype 模块
 cd prototype
 pixi shell
+# 先编译 robot_msgs（如果依赖它）
+colcon build --packages-select robot_msgs
+# 然后编译目标包
 colcon build --packages-select data_collector
 
 # quest 模块
 cd quest
 pixi shell
+# 先编译 robot_msgs（如果依赖它）
+colcon build --packages-select robot_msgs
+# 然后编译目标包
 colcon build --packages-select quest3s_vr
+```
+
+或者直接编译所有包，`colcon` 会自动处理依赖顺序：
+```bash
+colcon build --symlink-install
 ```
 
 ## 常用开发命令
@@ -389,6 +431,27 @@ ros2 node info /node_name
    source install/setup.bash
    ```
 3. 确认所有依赖已安装：`pixi install`
+4. 确认 `robot_msgs` 已编译：如果节点依赖 `robot_msgs`，确保它已成功编译
+
+### robot_msgs 编译失败
+
+如果 `robot_msgs` 编译失败：
+
+1. 检查符号链接是否存在：
+   ```bash
+   ls -la prototype/src/robot_msgs
+   ls -la quest/src/robot_msgs
+   ```
+
+2. 如果符号链接不存在，手动创建：
+   ```bash
+   cd prototype/src
+   ln -sf ../../robot_msgs robot_msgs
+   cd ../../quest/src
+   ln -sf ../../robot_msgs robot_msgs
+   ```
+
+3. 检查 `robot_msgs/package.xml` 中的 email 地址格式是否正确（必须是有效的 email 格式）
 
 ### 摄像头设备权限问题
 

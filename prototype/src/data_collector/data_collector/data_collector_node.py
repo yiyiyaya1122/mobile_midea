@@ -12,12 +12,12 @@ from typing import Dict, Any, List
 from dataclasses import dataclass
 from bisect import bisect_left
 import threading
+from datetime import datetime
 from std_srvs.srv import Trigger
 from data_collector.data_processor import DataProcessor
 import yaml
 from pathlib import Path
 from ament_index_python.packages import get_package_share_directory
-import time
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
 def load_topics_config(config_path):
@@ -38,6 +38,18 @@ class DataCollector(Node):
         self.collected_dataset_list = []
         self.dataset_cfg_dict = {}
 
+        # 处理 data_dir：如果为 "auto" 或空，自动创建日期目录
+        data_dir = self.config.get('data_dir', 'auto')
+        if data_dir == 'auto' or not data_dir or (isinstance(data_dir, str) and data_dir.strip() == ''):
+            # 从配置文件读取 base_dir，如果没有则使用默认值
+            base_dir = self.config.get('base_dir', '/home/r1lite/GalaxeaDataset')
+            date_str = datetime.now().strftime('%Y%m%d')
+            data_dir = os.path.join(base_dir, date_str)
+            self.config['data_dir'] = data_dir
+            # 确保目录存在
+            os.makedirs(data_dir, exist_ok=True)
+            self.get_logger().info(f"📁 自动创建日期目录: {data_dir}")
+        
         self.get_logger().info(f"data_dir: {self.config['data_dir']}")
         self.get_logger().info(f"robot_number: {self.config['robot_number']}")
         self.get_logger().info(f"collection_frequency: {self.config['collection_frequency']}")

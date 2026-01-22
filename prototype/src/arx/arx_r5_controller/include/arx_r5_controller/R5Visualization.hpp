@@ -7,9 +7,9 @@
 #include "arx_r5_src/interfaces/InterfacesThread.hpp"
 #include "arx_r5_src/interfaces/InterfaceTools.hpp"
 
-#include "arx5_arm_msg/msg/robot_cmd.hpp"
-#include "arx5_arm_msg/msg/robot_status.hpp"
-#include "arm_control/msg/pos_cmd.hpp"
+#include "robot_msgs/msg/robot_cmd.hpp"
+#include "robot_msgs/msg/robot_status.hpp"
+#include "robot_msgs/msg/pos_cmd.hpp"
 
 #include "tf2_msgs/msg/tf_message.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
@@ -22,10 +22,10 @@ namespace arx::r5
         R5Visualization();
 
     private:
-        void subArmCallback(const arx5_arm_msg::msg::RobotStatus::SharedPtr msg);
+        void subArmCallback(const robot_msgs::msg::RobotStatus::SharedPtr msg);
         void PubState();
 
-        rclcpp::Subscription<arx5_arm_msg::msg::RobotStatus>::SharedPtr joint_state_subscriber_;
+        rclcpp::Subscription<robot_msgs::msg::RobotStatus>::SharedPtr joint_state_subscriber_;
         
         rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_publisher_;
 

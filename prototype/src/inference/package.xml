@@ -8,6 +8,7 @@
   <license>TODO: License declaration</license>
 
   <exec_depend>pyzmq</exec_depend>
+  <exec_depend>robot_msgs</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>

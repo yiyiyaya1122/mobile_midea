@@ -1,4 +1,3 @@
-# VRButtons.msg
 bool a
 bool b
 bool x
