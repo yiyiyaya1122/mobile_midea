@@ -58,8 +58,9 @@ mobile_midea/
 │   ├── install/                  # 安装目录
 │   └── README.md                 # 详细文档
 ├── quick_start/                  # 一键启动脚本
-│   ├── quick_start.sh            # 主启动脚本（tmux 多 pane）
-│   └── galaxea_robot_startup.sh         # galaxea_robot_startup 包装脚本
+│   ├── quick_collect.sh          # 数据收集启动脚本（tmux 3x2 布局）
+│   ├── quick_replay.sh           # 数据回放启动脚本（tmux 2x2 布局）
+│   └── galaxea_robot_startup.sh  # galaxea_robot_startup 包装脚本
 └── README.md                     # 本文件
 ```
 
@@ -79,7 +80,16 @@ mobile_midea/
 ### prototype/ - 主控制模块
 包含完整的机器人控制系统：
 - **数据收集**：多传感器数据同步采集和 HDF5 存储
+  - 支持 chassis 和 torso target 速度数据收集
+  - 支持图像、关节状态、底盘/躯干速度等多种数据类型
 - **推理模块**：ARX 和 YAM 机械臂的 AI 推理控制
+  - `joint_base_node`：关节和底盘状态/命令传输，支持 chassis 和 torso 数据推理
+  - `camera_node`：相机图像传输到远程推理服务器
+  - `data_replay_node`：HDF5 数据回放节点，用于在没有推理机时验证数据有效性
+    - 使用 `replay_config.yaml` 配置文件
+    - 发布命令 topic（`/YAM_VR_L`、`/YAM_VR_R` 或 `/ARX_INFER_L`、`/ARX_INFER_R`）而不是状态 topic
+    - 不发布相机数据，仅发布关节命令和底盘/躯干目标速度
+    - 支持 `arm_type` 参数（`yam` 或 `arx`）
 - **机械臂控制**：ARX R5 和 YAM 双机械臂控制器
 - **CAN 总线**：统一的 CAN 配置管理（ARX、YAM、Galaxea）
 - **摄像头驱动**：RealSense 和 UVC 摄像头支持
@@ -96,8 +106,14 @@ Quest 3/3S VR 设备集成：
 
 ### quick_start/ - 一键启动
 提供便捷的一键启动功能：
-- **tmux 多 pane 管理**：自动创建 4 个 pane（CAN、VR、ARM、DATA）
-- **自动配置**：自动配置 CAN 接口、ADB 设备等
+- **`quick_collect.sh`**：数据收集启动脚本
+  - tmux 3x2 布局（6 个 pane：CAN、VR、ARM、DATA、Camera、Rviz2）
+  - 自动配置 CAN 接口、ADB 设备等
+  - 启动完整的数据收集环境
+- **`quick_replay.sh`**：数据回放启动脚本
+  - tmux 2x2 布局（4 个 pane：DATA_REPLAY、INFERENCE、CAMERA、RVIZ2）
+  - 支持参数化配置（HDF5 文件、配置文件、循环播放等）
+  - 用于验证采集数据的有效性
 - **状态监控**：实时显示各组件启动状态
 
 # 安装指南
@@ -229,17 +245,16 @@ source install/setup.bash
 使用一键启动脚本自动配置和启动所有组件：
 
 ```bash
-bash quick_start/quick_start.sh
+bash quick_start/quick_collect.sh
 ```
 
-该脚本会：
-1. 自动配置 Galaxea CAN 接口（can0）
-2. 自动配置 YAM CAN 接口（can_yam_l、can_yam_r）
-3. 自动检测并配置 ADB 设备
-4. 启动 galaxea_robot_startup.sh（底层驱动）
-5. 启动 VR ROS2 节点
-6. 启动 ARM 控制节点
-7. 启动数据收集节点
+该脚本会创建 3 行 2 列的 tmux 布局，自动启动：
+1. **CAN**（左上）：自动配置 Galaxea CAN 接口并启动底层驱动
+2. **VR**（右上）：自动检测并配置 ADB 设备，启动 VR ROS2 节点
+3. **ARM**（左中）：自动配置 YAM CAN 接口，启动 ARM 控制节点
+4. **DATA**（右中）：启动数据收集节点
+5. **Camera**（左下）：启动 UVC 摄像头节点
+6. **Rviz2**（右下）：启动 Rviz2 可视化工具
 
 所有组件会在 tmux 的不同 pane 中运行，方便监控和管理。
 
@@ -296,6 +311,81 @@ ros2 launch inference infer_yam.launch.py
 # 或
 bash bash/infer_yam.sh
 ```
+
+**推理模块功能**：
+- 支持机械臂关节状态和命令传输
+- 支持底盘和躯干速度数据推理
+- 支持相机图像传输到远程推理服务器
+- 通过 ZMQ 与远程推理服务器通信
+
+### 4.1. 数据回放（验证数据有效性）
+
+当没有推理机进行推理时，可以使用数据回放功能验证采集的数据：
+
+#### 🚀 一键启动（推荐）
+
+使用一键启动脚本快速启动数据回放环境：
+
+```bash
+# 基本用法
+bash quick_start/quick_replay.sh /path/to/collection_xxx.hdf5
+
+# 完整参数
+bash quick_start/quick_replay.sh \
+    /path/to/collection_xxx.hdf5 \
+    /path/to/replay_config.yaml \
+    true \
+    yam
+```
+
+该脚本会创建 2 行 2 列的 tmux 布局，自动启动：
+1. **DATA_REPLAY**（左上）：数据回放节点
+2. **INFERENCE**（右上）：推理节点（接收回放数据）
+3. **CAMERA**（左下）：UVC 摄像头节点
+4. **RVIZ2**（右下）：可视化工具
+
+#### 手动启动
+
+```bash
+cd prototype
+pixi shell
+source install/setup.bash
+
+# 使用 launch 文件（默认使用 replay_config.yaml）
+ros2 launch inference data_replay.launch.py \
+    hdf5_file:=/path/to/collection_xxx.hdf5 \
+    loop:=false \
+    arm_type:=yam
+
+# 指定配置文件路径
+ros2 launch inference data_replay.launch.py \
+    hdf5_file:=/path/to/collection_xxx.hdf5 \
+    config_path:=/path/to/replay_config.yaml \
+    loop:=false \
+    arm_type:=yam
+
+# 或直接运行节点
+ros2 run inference data_replay_node \
+    --ros-args \
+    -p hdf5_file:=/path/to/collection_xxx.hdf5 \
+    -p config_path:=/path/to/replay_config.yaml \
+    -p loop:=false \
+    -p arm_type:=yam
+
+# 使用服务控制回放
+ros2 service call /start_replay std_srvs/srv/Trigger
+ros2 service call /stop_replay std_srvs/srv/Trigger
+```
+
+**功能特性**：
+- 按原始采集频率回放数据
+- 支持循环播放（设置 `loop:=true`）
+- 自动将关节位置数据转换为命令消息（`YamCmd` 或 `RobotCmd`）
+- 发布到命令 topic（`/YAM_VR_L`、`/YAM_VR_R` 或 `/ARX_INFER_L`、`/ARX_INFER_R`）
+- 不发布相机数据，仅发布关节命令和底盘/躯干目标速度
+- 支持 `arm_type` 参数选择机械臂类型（`yam` 或 `arx`）
+- 使用 `replay_config.yaml` 配置文件（默认路径：`inference/config/replay_config.yaml`）
+- 可与推理节点配合，验证完整的数据流
 
 ### 5. 摄像头控制
 

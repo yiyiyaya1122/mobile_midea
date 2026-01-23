@@ -4,7 +4,7 @@
 set -e
 
 # ===================== 基本配置 =====================
-SESSION_NAME="r1lite"
+SESSION_NAME="r1lite_collect"
 
 PASSWORD="1"
 
@@ -41,7 +41,7 @@ tmux new-session -d -s "$SESSION_NAME" -n robot
 # ===================== Pane 布局 =====================
 # 目标布局：3行2列
 # 左列：CAN(0) | ARM(2) | Camera(4)
-# 右列：VR(1) | DATA(3) | Rviz2(5)
+# 右列：DATA(1) | VR(3) | Rviz2(5)
 # 注意：pane编号由split顺序决定
 
 # 创建左右两列
@@ -58,7 +58,7 @@ tmux split-window -v -t "$SESSION_NAME:robot.3"    # 右列再分割：1(右上)
 # 调整 pane 大小 - 使用 tiled 布局确保所有面板大小完全一致
 tmux select-layout -t "$SESSION_NAME:robot" tiled
 
-# ===================== galaxea_robot_startup =====================
+# ===================== galaxea_robot_startup pane=====================
 tmux send-keys -t "$SESSION_NAME:robot.0" "
 set +x
 tmux select-pane -T 'CAN'
@@ -73,20 +73,18 @@ bash $QUICK_START_DIR/galaxea_robot_startup.sh
 exec bash
 " C-m
 
-# ===================== VR pane =====================
-# 注意：根据split顺序，VR在pane 1（右列上）
+# ===================== DATA_COLLECTOR pane =====================
+# 注意：根据split顺序，DATA在pane 1（右列上）
 tmux send-keys -t "$SESSION_NAME:robot.1" "
 set +x
-tmux select-pane -T 'VR…'
-cd $QUEST_DIR || exit 1
+tmux select-pane -T 'DATA_COLLECTOR'
+cd $PROTOTYPE_DIR || exit 1
 
-# 配置 ADB 设备，如果失败则退出
-bash bash/adb.sh || exit 1
-
-# 启动 VR ROS2 节点
+# 启动 DATA_COLLECTOR 节点
 source install/setup.bash
-pixi run ros2 launch quest3s_vr vr_control.launch.py
+pixi run ros2 launch data_collector data_collector.launch.py
 
+exec bash
 " C-m
 
 # ===================== ARM pane =====================
@@ -103,19 +101,25 @@ bash $PROTOTYPE_DIR/CAN/YAM/activate_yam_can.sh
 # 启动 ARM 控制节点
 source install/setup.bash
 pixi run ros2 launch yam_damiao_controller open_vr_double_arm.launch.py
+
+exec bash
 " C-m
 
-# ===================== DATA_COLLECTOR pane =====================
-# 注意：根据split顺序，DATA在pane 3（右列中）
+# ===================== VR pane =====================
+# 注意：根据split顺序，VR在pane 3（右列中）
 tmux send-keys -t "$SESSION_NAME:robot.3" "
 set +x
-tmux select-pane -T 'DATA_COLLECTOR'
-cd $PROTOTYPE_DIR || exit 1
+tmux select-pane -T 'VR…'
+cd $QUEST_DIR || exit 1
 
-# 启动 DATA_COLLECTOR 节点
+# 配置 ADB 设备，如果失败则退出
+bash bash/adb.sh || exit 1
+
+# 启动 VR ROS2 节点
 source install/setup.bash
-pixi run ros2 launch data_collector data_collector.launch.py
+pixi run ros2 launch quest3s_vr vr_control.launch.py
 
+exec bash
 " C-m
 
 # ===================== Camera pane =====================
@@ -129,6 +133,7 @@ cd $PROTOTYPE_DIR || exit 1
 source install/setup.bash
 ./scripts/uvc_cameras.py
 
+exec bash
 " C-m
 
 # ===================== Rviz2 pane =====================
@@ -142,6 +147,7 @@ cd $PROTOTYPE_DIR || exit 1
 source install/setup.bash
 rviz2
 
+exec bash
 " C-m
 
 # ===================== 进入 tmux =====================

@@ -3,6 +3,20 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 import os
 
+def check_device_exists(device_path):
+    """Check if camera device exists"""
+    # Check if the symlink exists
+    if not os.path.exists(device_path):
+        return False
+    # Check if it's a valid symlink pointing to a real device
+    if os.path.islink(device_path):
+        real_path = os.readlink(device_path)
+        if not os.path.isabs(real_path):
+            # Relative symlink, resolve it
+            real_path = os.path.join(os.path.dirname(device_path), real_path)
+        return os.path.exists(real_path)
+    return os.path.exists(device_path)
+
 def create_camera_node(camera_config):
     return Node(
         package='v4l2_camera',
@@ -53,8 +67,23 @@ def generate_launch_description():
         }
     ]
 
-    # Create nodes for all cameras
-    nodes = [create_camera_node(config) for config in v4l2_configs]
+    # Create nodes only for existing cameras
+    nodes = []
+    for config in v4l2_configs:
+        device_path = config['device_path']
+        if check_device_exists(device_path):
+            nodes.append(create_camera_node(config))
+            print(f"✅ Found camera: {config['camera_name']} at {device_path}")
+        else:
+            print(f"⚠️  Camera device not found: {config['camera_name']} at {device_path}")
+            print(f"   Please check USB connection and udev rules")
+    
+    if not nodes:
+        print("❌ No camera devices found. Please check:")
+        print("   1. USB connections")
+        print("   2. udev rules: sudo udevadm control --reload-rules && sudo udevadm trigger")
+        print("   3. Device permissions: ls -la /dev/uvc_camera/")
+        return LaunchDescription([])
 
     return LaunchDescription(nodes)
 

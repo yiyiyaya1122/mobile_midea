@@ -10,11 +10,13 @@
 #include <array>
 #include <stdexcept>
 #include <chrono>
+#include <thread>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
 #include <net/if.h>
 #include <unistd.h>
+#include <errno.h>
 #include <linux/can.h>
 #include <linux/can/raw.h>
 
@@ -67,7 +69,25 @@ public:
 
     ssize_t n = ::write(sockfd_, &frame, sizeof(frame));
     if (n != (ssize_t)sizeof(frame)) {
-      if (n < 0) perror("write(can)");
+      if (n < 0) {
+        // Check for specific error: ENOBUFS (No buffer space available)
+        if (errno == ENOBUFS) {
+          // Buffer full - this can happen at high frequencies
+          // Try once more after a very short delay
+          std::this_thread::sleep_for(std::chrono::microseconds(100));
+          n = ::write(sockfd_, &frame, sizeof(frame));
+          if (n < 0 && errno == ENOBUFS) {
+            // Still failing, log but don't spam
+            static int error_count = 0;
+            if (error_count++ % 100 == 0) {  // Log every 100th error
+              fprintf(stderr, "write(can): No buffer space available (error count: %d). "
+                      "Consider reducing control frequency or increasing SO_SNDBUF.\n", error_count);
+            }
+          }
+        } else {
+          perror("write(can)");
+        }
+      }
     }
     return n;
   }
@@ -134,6 +154,21 @@ private:
     if (sockfd_ < 0) {
       perror("socket(PF_CAN)");
       throw std::runtime_error("Failed to create CAN socket");
+    }
+
+    // Increase send buffer size to prevent "No buffer space available" errors
+    // Default is usually 16KB, increase to 64KB for high-frequency control
+    int sndbuf = 65536;  // 64KB send buffer
+    if (setsockopt(sockfd_, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf)) < 0) {
+      perror("setsockopt(SO_SNDBUF)");
+      // Continue anyway, as this is not critical
+    }
+
+    // Also increase receive buffer
+    int rcvbuf = 65536;  // 64KB receive buffer
+    if (setsockopt(sockfd_, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf)) < 0) {
+      perror("setsockopt(SO_RCVBUF)");
+      // Continue anyway, as this is not critical
     }
 
     struct ifreq ifr;

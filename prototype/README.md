@@ -116,7 +116,16 @@ CAN 总线配置和映射脚本：
   - `arx_cmd_pub/`：Python 命令发布节点
   - `arx_r5_controller/`：C++ 控制器，包含配置、launch 文件和源代码
 - **`data_collector/`**：数据收集和记录功能，支持 HDF5 格式存储
+  - 支持多传感器数据同步采集（图像、关节状态、底盘/躯干速度等）
+  - 支持 chassis 和 torso target 速度数据收集
 - **`inference/`**：AI 推理节点，支持 ARX 和 YAM 设备
+  - `joint_base_node`：关节和底盘状态/命令传输，支持 chassis 和 torso 数据推理
+  - `camera_node`：相机图像传输到远程推理服务器
+  - `data_replay_node`：HDF5 数据回放节点，用于在没有推理机时验证数据有效性
+    - 使用 `replay_config.yaml` 配置文件
+    - 发布命令 topic（`/YAM_VR_L`、`/YAM_VR_R` 或 `/ARX_INFER_L`、`/ARX_INFER_R`）而不是状态 topic
+    - 不发布相机数据，仅发布关节命令和底盘/躯干目标速度
+    - 支持 `arm_type` 参数（`yam` 或 `arx`）
 - **`msg/`**：自定义 ROS 2 消息类型定义
   - ARX 和 YAM 机械臂消息
   - Quest2 按钮消息
@@ -276,6 +285,70 @@ ros2 launch inference infer_yam.launch.py
 # 或
 bash/infer_yam.sh
 ```
+
+### 2.1. 数据回放（验证数据有效性）
+
+当没有推理机进行推理时，可以使用数据回放功能验证采集的数据：
+
+#### 🚀 一键启动（推荐）
+
+使用一键启动脚本快速启动数据回放环境：
+
+```bash
+# 基本用法
+bash ../quick_start/quick_replay.sh /path/to/collection_xxx.hdf5
+
+# 完整参数
+bash ../quick_start/quick_replay.sh \
+    /path/to/collection_xxx.hdf5 \
+    /path/to/replay_config.yaml \
+    true \
+    yam
+```
+
+该脚本会创建 2 行 2 列的 tmux 布局，自动启动：
+1. **DATA_REPLAY**（左上）：数据回放节点
+2. **INFERENCE**（右上）：推理节点（接收回放数据）
+3. **CAMERA**（左下）：UVC 摄像头节点
+4. **RVIZ2**（右下）：可视化工具
+
+#### 手动启动
+
+```bash
+# 使用 launch 文件（默认使用 replay_config.yaml）
+ros2 launch inference data_replay.launch.py \
+    hdf5_file:=/path/to/collection_xxx.hdf5 \
+    loop:=false \
+    arm_type:=yam
+
+# 指定配置文件路径
+ros2 launch inference data_replay.launch.py \
+    hdf5_file:=/path/to/collection_xxx.hdf5 \
+    config_path:=/path/to/replay_config.yaml \
+    loop:=false \
+    arm_type:=yam
+
+# 或直接运行节点
+ros2 run inference data_replay_node \
+    --ros-args \
+    -p hdf5_file:=/path/to/collection_xxx.hdf5 \
+    -p config_path:=/path/to/replay_config.yaml \
+    -p loop:=false \
+    -p arm_type:=yam
+
+# 使用服务控制回放
+ros2 service call /start_replay std_srvs/srv/Trigger
+ros2 service call /stop_replay std_srvs/srv/Trigger
+```
+
+**功能特性**：
+- 按原始采集频率回放数据
+- 支持循环播放（设置 `loop:=true`）
+- 自动将关节位置数据转换为命令消息（`YamCmd` 或 `RobotCmd`）
+- 发布到命令 topic（`/YAM_VR_L`、`/YAM_VR_R` 或 `/ARX_INFER_L`、`/ARX_INFER_R`）
+- 不发布相机数据，仅发布关节命令和底盘/躯干目标速度
+- 支持 `arm_type` 参数选择机械臂类型（`yam` 或 `arx`）
+- 使用 `replay_config.yaml` 配置文件（默认路径：`inference/config/replay_config.yaml`）
 
 ### 3. 摄像头控制
 

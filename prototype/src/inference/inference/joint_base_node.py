@@ -15,8 +15,13 @@ remotename = "192.168.0.5"
 
 arm_status_port = 6001
 base_status_port = 6002
+chassis_target_port = 6008
+torso_target_port = 6009
+
 arm_cmd_port = 6006
 base_cmd_port = 6007
+chassis_cmd_port = 6010
+torso_cmd_port = 6011
 
 class Processor(Node):
     def __init__(self):
@@ -49,25 +54,35 @@ class Processor(Node):
         # ZMQ connections for publishing status
         self.socket_arm_pub, _ = self.create_zmq_connection(socket_type=zmq.PUB, port=arm_status_port, hwm=2)
         self.socket_base_pub, _ = self.create_zmq_connection(socket_type=zmq.PUB, port=base_status_port, hwm=2)
+        self.socket_chassis_target_pub, _ = self.create_zmq_connection(socket_type=zmq.PUB, port=chassis_target_port, hwm=2)
+        self.socket_torso_target_pub, _ = self.create_zmq_connection(socket_type=zmq.PUB, port=torso_target_port, hwm=2)
         
         # ZMQ connections for subscribing to commands
         self.socket_arm_sub, _ = self.create_zmq_connection(socket_type=zmq.SUB, port=arm_cmd_port, hwm=2)
         self.socket_base_sub, _ = self.create_zmq_connection(socket_type=zmq.SUB, port=base_cmd_port, hwm=2)
+        self.socket_chassis_cmd_sub, _ = self.create_zmq_connection(socket_type=zmq.SUB, port=chassis_cmd_port, hwm=2)
+        self.socket_torso_cmd_sub, _ = self.create_zmq_connection(socket_type=zmq.SUB, port=torso_cmd_port, hwm=2)
 
         self.current_left_status = None
         self.current_right_status = None
         self.current_base_status = None
+        self.current_chassis_target = None
+        self.current_torso_target = None
         self.pub_rate = 50
 
         # ROS 2 Subscribers for robot status
         self.create_subscription(self.StatusMsg, self.left_status_topic, self.left_status_callback, 1)
         self.create_subscription(self.StatusMsg, self.right_status_topic, self.right_status_callback, 1)
         self.create_subscription(Odometry, '/odom', self.base_status_callback, 1)
+        self.create_subscription(TwistStamped, '/motion_target/target_speed_chassis', self.chassis_target_callback, 1)
+        self.create_subscription(TwistStamped, '/motion_target/target_speed_torso', self.torso_target_callback, 1)
 
         # ROS 2 Publishers for robot commands
         self.right_cmd_pub = self.create_publisher(self.CmdMsg, self.right_cmd_topic, 1)
         self.left_cmd_pub = self.create_publisher(self.CmdMsg, self.left_cmd_topic, 1)
         self.base_cmd_pub = self.create_publisher(TwistStamped, '/cmd_vel', 1)
+        self.chassis_cmd_pub = self.create_publisher(TwistStamped, '/motion_target/target_speed_chassis', 1)
+        self.torso_cmd_pub = self.create_publisher(TwistStamped, '/motion_target/target_speed_torso', 1)
 
         # State variable for takeover
         self.is_taken_over = False
@@ -120,6 +135,26 @@ class Processor(Node):
                                              twist.linear.z,
                                              ])
     
+    def chassis_target_callback(self, msg):
+        twist = msg.twist
+        self.current_chassis_target = np.array([twist.angular.x,
+                                                twist.angular.y,
+                                                twist.angular.z,
+                                                twist.linear.x,
+                                                twist.linear.y,
+                                                twist.linear.z,
+                                                ])
+    
+    def torso_target_callback(self, msg):
+        twist = msg.twist
+        self.current_torso_target = np.array([twist.angular.x,
+                                              twist.angular.y,
+                                              twist.angular.z,
+                                              twist.linear.x,
+                                              twist.linear.y,
+                                              twist.linear.z,
+                                              ])
+    
     def arm_takeover_callback(self, request, response):
         self.is_taken_over = True
         self.get_logger().info('✅ Arm takeover service called. Robot command publishing suspended.')
@@ -165,14 +200,29 @@ class Processor(Node):
     def send_base(self, base):
         base_msg = self.base_msg(base)
         self.base_cmd_pub.publish(base_msg)
+    
+    def send_chassis(self, chassis):
+        chassis_msg = self.base_msg(chassis)
+        self.chassis_cmd_pub.publish(chassis_msg)
+    
+    def send_torso(self, torso):
+        torso_msg = self.base_msg(torso)
+        self.torso_cmd_pub.publish(torso_msg)
 
     def process_callback(self):
+        # Publish status data to inference server
         if self.current_left_status is not None and self.current_right_status is not None:
             concat_arm = np.concatenate((self.current_left_status, self.current_right_status))
             self.socket_arm_pub.send(pickle.dumps(concat_arm))
         
         if self.current_base_status is not None:
             self.socket_base_pub.send(pickle.dumps(self.current_base_status))
+        
+        if self.current_chassis_target is not None:
+            self.socket_chassis_target_pub.send(pickle.dumps(self.current_chassis_target))
+        
+        if self.current_torso_target is not None:
+            self.socket_torso_target_pub.send(pickle.dumps(self.current_torso_target))
 
         # Only publish commands if the arm is NOT taken over
         if not self.is_taken_over:
@@ -188,6 +238,20 @@ class Processor(Node):
                 base_message = self.socket_base_sub.recv(flags=zmq.NOBLOCK)
                 base = pickle.loads(base_message)
                 self.send_base(base)
+            except zmq.Again:
+                pass
+            
+            try:
+                chassis_message = self.socket_chassis_cmd_sub.recv(flags=zmq.NOBLOCK)
+                chassis = pickle.loads(chassis_message)
+                self.send_chassis(chassis)
+            except zmq.Again:
+                pass
+            
+            try:
+                torso_message = self.socket_torso_cmd_sub.recv(flags=zmq.NOBLOCK)
+                torso = pickle.loads(torso_message)
+                self.send_torso(torso)
             except zmq.Again:
                 pass
 

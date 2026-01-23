@@ -13,6 +13,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'launch'), glob('launch/*')),
+        (os.path.join('share', package_name, 'config'), glob('config/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -23,7 +24,8 @@ setup(
     entry_points={
         'console_scripts': [
             'joint_base_node = inference.joint_base_node:main',
-            'camera_node = inference.camera_node:main'
+            'camera_node = inference.camera_node:main',
+            'data_replay_node = inference.data_replay_node:main',
         ],
     },
 )

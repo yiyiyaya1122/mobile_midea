@@ -9,6 +9,9 @@
 
   <exec_depend>pyzmq</exec_depend>
   <exec_depend>robot_msgs</exec_depend>
+  <exec_depend>h5py</exec_depend>
+  <exec_depend>pyyaml</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>
