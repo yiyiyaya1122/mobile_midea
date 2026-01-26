@@ -79,6 +79,12 @@ class JointPositionProcessor(DataProcessor):
         return np.array(msg.joint_pos)
 
 
+class CmdJointPositionProcessor(DataProcessor):
+    def process(self, msg):
+        joint_pos = msg.joint_pos
+        gripper = msg.gripper
+        return np.concatenate([joint_pos, [gripper]])
+
 class JointCurrentProcessor(DataProcessor):
     def process(self, msg):
         return np.array(msg.joint_cur)

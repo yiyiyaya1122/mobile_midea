@@ -156,22 +156,9 @@ exec bash
 tmux send-keys -t "$SESSION_NAME:replay.3" "
 set +x
 tmux select-pane -T 'CONTROL'
-cd $PROTOTYPE_DIR || exit 1
+cd $QUICK_START_DIR || exit 1
 
-echo '========================================'
-echo '  数据回放控制面板'
-echo '========================================'
-echo ''
-echo '使用以下命令控制回放:'
-echo ''
-echo '  启动回放:'
-echo '    ros2 service call /start_replay std_srvs/srv/Trigger'
-echo ''
-echo '  停止回放:'
-echo '    ros2 service call /stop_replay std_srvs/srv/Trigger'
-echo ''
-echo '========================================'
-echo ''
+bash control_replay.sh
 
 exec bash
 " C-m

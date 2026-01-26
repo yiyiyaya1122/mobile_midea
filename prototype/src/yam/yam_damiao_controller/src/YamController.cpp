@@ -504,6 +504,9 @@ namespace yam {
     }
 
 	void YamController::publishState() {
+        // Set timestamp before reading data to minimize delay
+        auto data_timestamp = this->get_clock()->now();
+        
         interfaces_ptr_damiao_->updateYamStatus();
         
         joint_positions_ = interfaces_ptr_damiao_->getJointPositions();
@@ -514,7 +517,7 @@ namespace yam {
         gripper_torques_ = interfaces_ptr_damiao_->getGripperCurrent();
 
         auto robot_status_msg = robot_msgs::msg::YamStatus();
-        robot_status_msg.header.stamp = this->get_clock()->now();
+        robot_status_msg.header.stamp = data_timestamp;
 
         Eigen::VectorXd q(6);
         for (size_t i = 0; i < 6; ++i) {

@@ -357,8 +357,9 @@ inline Limit_param limit_param[Num_Of_Motor]=
         Motor_Control(SerialPort::SharedPtr serial = nullptr): serial_(std::move(serial))
         {
             if (serial_ == nullptr) {
-                // default to can0
-                serial_ = std::make_shared<SerialPort>("can0", 0);
+                // default to can0 with reduced timeout (1ms instead of 200ms) to minimize delay
+                // The timeout is used for blocking CAN reads, reducing it prevents 200ms delays
+                serial_ = std::make_shared<SerialPort>("can0", 0, 1);
             }
         }
 

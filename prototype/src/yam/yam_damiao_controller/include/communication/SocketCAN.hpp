@@ -67,22 +67,34 @@ public:
     else frame.can_id = can_id & CAN_SFF_MASK;
     std::memcpy(frame.data, data, len);
 
+    // Try to write, with retry logic for ENOBUFS
     ssize_t n = ::write(sockfd_, &frame, sizeof(frame));
     if (n != (ssize_t)sizeof(frame)) {
       if (n < 0) {
         // Check for specific error: ENOBUFS (No buffer space available)
-        if (errno == ENOBUFS) {
-          // Buffer full - this can happen at high frequencies
-          // Try once more after a very short delay
-          std::this_thread::sleep_for(std::chrono::microseconds(100));
-          n = ::write(sockfd_, &frame, sizeof(frame));
-          if (n < 0 && errno == ENOBUFS) {
-            // Still failing, log but don't spam
-            static int error_count = 0;
-            if (error_count++ % 100 == 0) {  // Log every 100th error
-              fprintf(stderr, "write(can): No buffer space available (error count: %d). "
-                      "Consider reducing control frequency or increasing SO_SNDBUF.\n", error_count);
+        if (errno == ENOBUFS || errno == EAGAIN || errno == EWOULDBLOCK) {
+          // Buffer full or would block - retry with exponential backoff
+          for (int retry = 0; retry < 3; ++retry) {
+            std::this_thread::sleep_for(std::chrono::microseconds(50 * (retry + 1)));
+            n = ::write(sockfd_, &frame, sizeof(frame));
+            if (n == (ssize_t)sizeof(frame)) {
+              // Success after retry
+              static int retry_success_count = 0;
+              if (retry_success_count++ % 1000 == 0) {
+                fprintf(stderr, "write(can): Retry succeeded after %d attempts (total retries: %d)\n", 
+                        retry + 1, retry_success_count);
+              }
+              return n;
             }
+            if (errno != ENOBUFS && errno != EAGAIN && errno != EWOULDBLOCK) {
+              break;  // Different error, don't retry
+            }
+          }
+          // Still failing after retries, log but don't spam
+          static int error_count = 0;
+          if (error_count++ % 100 == 0) {  // Log every 100th error
+            fprintf(stderr, "write(can): No buffer space available after retries (error count: %d). "
+                    "Control frequency may be too high or CAN device is slow.\n", error_count);
           }
         } else {
           perror("write(can)");
@@ -157,18 +169,27 @@ private:
     }
 
     // Increase send buffer size to prevent "No buffer space available" errors
-    // Default is usually 16KB, increase to 64KB for high-frequency control
-    int sndbuf = 65536;  // 64KB send buffer
+    // Control frequency: 250Hz, 14 motors (7 per arm) = 3500 frames/sec
+    // Each frame ~16 bytes = 56KB/sec, need larger buffer for safety
+    int sndbuf = 262144;  // 256KB send buffer (4x safety margin)
     if (setsockopt(sockfd_, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf)) < 0) {
       perror("setsockopt(SO_SNDBUF)");
-      // Continue anyway, as this is not critical
+      // Try smaller buffer if system limit
+      sndbuf = 131072;  // 128KB
+      if (setsockopt(sockfd_, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf)) < 0) {
+        perror("setsockopt(SO_SNDBUF fallback)");
+      }
     }
 
     // Also increase receive buffer
-    int rcvbuf = 65536;  // 64KB receive buffer
+    int rcvbuf = 262144;  // 256KB receive buffer
     if (setsockopt(sockfd_, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf)) < 0) {
       perror("setsockopt(SO_RCVBUF)");
-      // Continue anyway, as this is not critical
+      // Try smaller buffer if system limit
+      rcvbuf = 131072;  // 128KB
+      if (setsockopt(sockfd_, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf)) < 0) {
+        perror("setsockopt(SO_RCVBUF fallback)");
+      }
     }
 
     struct ifreq ifr;

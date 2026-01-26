@@ -104,8 +104,16 @@ class DataCollector(Node):
             if topic_name in topic_names
         }
 
-        # Create QoS profile for high-frequency topics
-        qos_profile = QoSProfile(
+        # Create QoS profiles
+        # Use RELIABLE for /YAM_VR_L and /YAM_VR_R to match publishers (yam_cmd_pub uses default RELIABLE QoS)
+        qos_profile_reliable = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1
+        )
+        
+        # Use BEST_EFFORT for other high-frequency topics (e.g., images, status)
+        qos_profile_best_effort = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
             history=HistoryPolicy.KEEP_LAST,
             depth=1
@@ -116,11 +124,17 @@ class DataCollector(Node):
             module = importlib.import_module(msg_module)
             msg_class = getattr(module, msg_type)
 
+            # Use RELIABLE QoS for arm command topics, BEST_EFFORT for others
+            if topic_name in ['/YAM_VR_L', '/YAM_VR_R']:
+                qos_profile = qos_profile_reliable
+            else:
+                qos_profile = qos_profile_best_effort
+
             self.create_subscription(
                 msg_class,
                 topic_name,
                 self.create_callback(topic_name),
-                qos_profile  # Use the custom QoS profile here
+                qos_profile
             )
 
             self.get_logger().info(f"create sub {topic_name}")
