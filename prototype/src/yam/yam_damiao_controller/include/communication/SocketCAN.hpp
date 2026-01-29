@@ -41,7 +41,7 @@ class SerialPort
 public:
   using SharedPtr = std::shared_ptr<SerialPort>;
 
-  SerialPort(const std::string &ifname, speed_t /*baudrate*/ = 0, int timeout_ms = 200)
+  SerialPort(const std::string &ifname, speed_t /*baudrate*/ = 0, int timeout_ms = 0.1)
     : sockfd_(-1)
   {
     set_timeout(timeout_ms);
@@ -168,25 +168,25 @@ private:
       throw std::runtime_error("Failed to create CAN socket");
     }
 
-    // Increase send buffer size to prevent "No buffer space available" errors
-    // Control frequency: 250Hz, 14 motors (7 per arm) = 3500 frames/sec
-    // Each frame ~16 bytes = 56KB/sec, need larger buffer for safety
-    int sndbuf = 262144;  // 256KB send buffer (4x safety margin)
+    // Send buffer: keep moderate size. Too large hides ENOBUFS and masks overload.
+    // ~16 bytes/frame, 7 motors @ 250Hz ≈ 28KB/s; 32KB allows ~1s burst headroom.
+    // int sndbuf = 32768;  // 32KB
+    int sndbuf = 16384;  // 16KB
     if (setsockopt(sockfd_, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf)) < 0) {
       perror("setsockopt(SO_SNDBUF)");
-      // Try smaller buffer if system limit
-      sndbuf = 131072;  // 128KB
+      sndbuf = 16384;  // 16KB fallback
       if (setsockopt(sockfd_, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf)) < 0) {
         perror("setsockopt(SO_SNDBUF fallback)");
       }
     }
 
-    // Also increase receive buffer
-    int rcvbuf = 262144;  // 256KB receive buffer
+    // Receive buffer: keep small to avoid reading stale data. Large buffer = more
+    // queued old frames → apparent latency. 32KB ≈ 2000 frames, enough for real-time.
+    // int rcvbuf = 32768;  // 32K
+    int rcvbuf = 16384;  // 16KBB
     if (setsockopt(sockfd_, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf)) < 0) {
       perror("setsockopt(SO_RCVBUF)");
-      // Try smaller buffer if system limit
-      rcvbuf = 131072;  // 128KB
+      rcvbuf = 16384;  // 16KB fallback
       if (setsockopt(sockfd_, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf)) < 0) {
         perror("setsockopt(SO_RCVBUF fallback)");
       }

@@ -32,7 +32,7 @@ MotorControl::MotorControl(std::vector<damiao::Motor> motor_config,
         }
     }
     
-    serial = std::make_shared<SerialPort>(serial_port, B921600);
+    serial = std::make_shared<SerialPort>(serial_port);
     DAMIAO_Control = std::make_shared<damiao::Motor_Control>(serial);
     
     // Initialize all vectors based on motor count
