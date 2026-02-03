@@ -4,8 +4,8 @@
 data_dir: "auto"
 
 # base_dir: 当 data_dir 为 "auto" 时，数据将保存在此基础目录下的日期子目录中
-# 默认值: /home/r1lite/GalaxeaDataset
-base_dir: "/home/r1lite/GalaxeaDataset"
+# 默认值: /media/r1lite/Extreme SSD/DATA_COLLECT
+base_dir: "/media/r1lite/Extreme SSD/DATA_COLLECT"
 
 max_queue_size: 5
 max_age: 0.5

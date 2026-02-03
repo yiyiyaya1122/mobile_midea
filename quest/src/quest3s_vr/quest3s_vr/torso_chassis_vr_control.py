@@ -168,7 +168,7 @@ class VRChassisTorsoControl(Node):
         self.get_logger().info('    左摇杆Y -> 前进/后退速度')
         self.get_logger().info('    左摇杆X -> 左/右移动速度')
         self.get_logger().info('    右摇杆X -> 转向角度')
-        self.get_logger().info('  躯干回零: 同时按下右边手柄的T+G键')
+        self.get_logger().info('  躯干回零: 同时按下左右手柄的T+G键')
         
 
     # =========================
@@ -197,8 +197,8 @@ class VRChassisTorsoControl(Node):
         self.last_ltr = ltr
         self.last_rtr = rtr
 
-        # 检测零位复位：同时按下右边手柄的T+G键（避免与底盘控制冲突）
-        reset_triggered = rtr and rg
+        # 检测零位复位：同时按下左右手柄的T+G键（避免与底盘控制冲突）
+        reset_triggered = ltr and lg and rtr and rg
 
         if reset_triggered and not self.last_reset_triggered:
             # 同时按下右边手柄的T+G键，执行零位复位（只在刚按下时触发一次）

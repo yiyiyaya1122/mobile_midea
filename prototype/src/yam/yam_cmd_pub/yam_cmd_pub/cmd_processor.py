@@ -43,10 +43,11 @@ class PoseProcessor(Node):
         self.last_button_b = False
         self.arm_processors = {}
 
+        # Depth > 1 avoids "Problem reserving CacheChange in reader" when publishers are high-rate
         qos_profile = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
             history=HistoryPolicy.KEEP_LAST,
-            depth=1
+            depth=10
         )
 
         self.base_cmd_pub = self.create_publisher(TwistStamped, '/cmd_vel', 1)

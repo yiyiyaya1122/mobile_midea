@@ -10,12 +10,15 @@ PASSWORD="${PASSWORD:-1}"
 # 配置 can_yam_l
 echo "$PASSWORD" | sudo -S ip link set down can_yam_l 2>/dev/null || true
 echo "$PASSWORD" | sudo -S ip link set can_yam_l type can bitrate 1000000 2>/dev/null || true
+echo "$PASSWORD" | sudo -S ip link set can_yam_l txqueuelen 128 2>/dev/null || true
 echo "$PASSWORD" | sudo -S ip link set up can_yam_l 2>/dev/null || true
 
 # 配置 can_yam_r
 echo "$PASSWORD" | sudo -S ip link set down can_yam_r 2>/dev/null || true
 echo "$PASSWORD" | sudo -S ip link set can_yam_r type can bitrate 1000000 2>/dev/null || true
+echo "$PASSWORD" | sudo -S ip link set can_yam_r txqueuelen 128 2>/dev/null || true
 echo "$PASSWORD" | sudo -S ip link set up can_yam_r 2>/dev/null || true
+
 
 # 验证配置
 echo ''

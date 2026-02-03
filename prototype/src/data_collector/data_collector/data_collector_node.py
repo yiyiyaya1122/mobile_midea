@@ -43,6 +43,13 @@ class DataCollector(Node):
         if data_dir == 'auto' or not data_dir or (isinstance(data_dir, str) and data_dir.strip() == ''):
             # 从配置文件读取 base_dir，如果没有则使用默认值
             base_dir = self.config.get('base_dir', '/home/r1lite/GalaxeaDataset')
+            # 若 base_dir 不存在（如移动硬盘未挂载），回退到本地目录
+            fallback_base = '/home/r1lite/GalaxeaDataset'
+            if not os.path.isdir(base_dir):
+                self.get_logger().warn(
+                    f"base_dir 不可用（路径不存在或非目录）: {base_dir}，使用 fallback: {fallback_base}"
+                )
+                base_dir = fallback_base
             date_str = datetime.now().strftime('%Y%m%d')
             data_dir = os.path.join(base_dir, date_str)
             self.config['data_dir'] = data_dir
