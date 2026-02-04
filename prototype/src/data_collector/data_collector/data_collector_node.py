@@ -1,15 +1,16 @@
+"""
+Data collector node: supports streaming HDF5 write or batch-in-memory write.
+Launch different configs via different launch files (config_path + optional use_streaming).
+"""
 import rclpy
 from rclpy.node import Node
-from rclpy.clock import Clock
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
-from cv_bridge import CvBridge
 import h5py
 import numpy as np
 import os
 import time
 import importlib
 from typing import Dict, Any, List
-from dataclasses import dataclass
 from bisect import bisect_left
 import threading
 from datetime import datetime
@@ -17,10 +18,10 @@ from std_srvs.srv import Trigger
 from data_collector.data_processor import DataProcessor
 import yaml
 from pathlib import Path
-from ament_index_python.packages import get_package_share_directory
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
-def load_topics_config(config_path):
+
+def load_topics_config(config_path: str) -> dict:
     with open(config_path) as f:
         config = yaml.safe_load(f)
     return config
@@ -30,40 +31,33 @@ class DataCollector(Node):
     def __init__(self):
         super().__init__('data_collector')
         self.declare_parameter('config_path', '')
+        self.declare_parameter('use_streaming', True)
         config_path = self.get_parameter('config_path').value
+        use_streaming_param = self.get_parameter('use_streaming').value
+        if isinstance(use_streaming_param, str):
+            self.use_streaming = use_streaming_param.lower() in ('true', '1', 'yes')
+        else:
+            self.use_streaming = bool(use_streaming_param)
         self.config = load_topics_config(config_path)
 
         self.is_collecting = False
         self.timer = None
-        self.collected_dataset_list = []
-        self.dataset_cfg_dict = {}
+        self.collected_dataset_list: List[Dict[str, np.ndarray]] = []
+        self.dataset_cfg_dict: Dict[str, dict] = {}
+        # Streaming: open HDF5 file and dataset refs (written each frame)
+        self.h5_file: h5py.File | None = None
+        self.h5_datasets: Dict[str, h5py.Dataset] = {}
+        self.streaming_frame_count = 0
+        self._h5_lock = threading.Lock()
 
-        # 处理 data_dir：如果为 "auto" 或空，自动创建日期目录
-        data_dir = self.config.get('data_dir', 'auto')
-        if data_dir == 'auto' or not data_dir or (isinstance(data_dir, str) and data_dir.strip() == ''):
-            # 从配置文件读取 base_dir，如果没有则使用默认值
-            base_dir = self.config.get('base_dir', '/home/r1lite/GalaxeaDataset')
-            # 若 base_dir 不存在（如移动硬盘未挂载），回退到本地目录
-            fallback_base = '/home/r1lite/GalaxeaDataset'
-            if not os.path.isdir(base_dir):
-                self.get_logger().warn(
-                    f"base_dir 不可用（路径不存在或非目录）: {base_dir}，使用 fallback: {fallback_base}"
-                )
-                base_dir = fallback_base
-            date_str = datetime.now().strftime('%Y%m%d')
-            data_dir = os.path.join(base_dir, date_str)
-            self.config['data_dir'] = data_dir
-            # 确保目录存在
-            os.makedirs(data_dir, exist_ok=True)
-            self.get_logger().info(f"📁 自动创建日期目录: {data_dir}")
-        
-        self.get_logger().info(f"data_dir: {self.config['data_dir']}")
-        self.get_logger().info(f"robot_number: {self.config['robot_number']}")
-        self.get_logger().info(f"collection_frequency: {self.config['collection_frequency']}")
-        self.get_logger().info(f"max_queue_size: {self.config['max_queue_size']}")
-        self.get_logger().info(f"datasets to collect: {self.config['datasets'].keys()}")
+        self._resolve_data_dir()
+        self.get_logger().info(
+            f"data_dir: {self.config['data_dir']}, robot_number: {self.config['robot_number']}, "
+            f"collection_frequency: {self.config['collection_frequency']}, use_streaming: {self.use_streaming}"
+        )
+        self.get_logger().info(f"datasets: {list(self.config['datasets'].keys())}")
 
-        self.bridge = CvBridge()
+        self.bridge = None  # CvBridge not used in node, processors have their own
         self.processors: Dict[str, DataProcessor] = {}
         self.buffers: Dict[str, List] = {}
         self.locks: Dict[str, threading.Lock] = {}
@@ -71,17 +65,34 @@ class DataCollector(Node):
         self.setup_subscriptions()
 
         self.srv_cb_group = MutuallyExclusiveCallbackGroup()
-        self.start_srv = self.create_service(
+        self.create_service(
             Trigger, 'start_collect', self.start_callback,
             callback_group=self.srv_cb_group)
-        self.stop_srv = self.create_service(
+        self.create_service(
             Trigger, 'stop_collect', self.stop_callback,
             callback_group=self.srv_cb_group)
 
+    def _resolve_data_dir(self) -> None:
+        data_dir = self.config.get('data_dir', 'auto')
+        if data_dir == 'auto' or not data_dir or (isinstance(data_dir, str) and data_dir.strip() == ''):
+            base_dir = self.config.get('base_dir', '/home/r1lite/GalaxeaDataset')
+            fallback_base = '/home/r1lite/GalaxeaDataset'
+            if not os.path.isdir(base_dir):
+                self.get_logger().warn(
+                    f"base_dir 不可用: {base_dir}，使用 fallback: {fallback_base}"
+                )
+                base_dir = fallback_base
+            date_str = datetime.now().strftime('%Y%m%d')
+            data_dir = os.path.join(base_dir, date_str)
+            self.config['data_dir'] = data_dir
+            os.makedirs(data_dir, exist_ok=True)
+            self.get_logger().info(f"📁 自动创建日期目录: {data_dir}")
+        else:
+            self.config['data_dir'] = data_dir
+        os.makedirs(self.config['data_dir'], exist_ok=True)
 
-    def setup_processors(self):
-        datasets = self.config['datasets']
-        for dataset_name, datset_value in datasets.items():
+    def setup_processors(self) -> None:
+        for dataset_name, datset_value in self.config['datasets'].items():
             try:
                 module_name, class_name = datset_value['processor'].rsplit('.', 1)
                 module = importlib.import_module(module_name)
@@ -89,119 +100,170 @@ class DataCollector(Node):
                 self.processors[dataset_name] = processor_class(
                     datset_value.get('processor_config', {})
                 )
-
                 topic_name = datset_value['topic']
                 self.buffers[topic_name] = []
-                if topic_name not in self.locks.keys():
+                if topic_name not in self.locks:
                     self.locks[topic_name] = threading.Lock()
-
                 dataset_config = self.processors[dataset_name].get_dataset_config()
-                self.get_logger().info(f"{dataset_name} config: {dataset_config}")
                 self.dataset_cfg_dict[dataset_name] = dataset_config
-
             except Exception as e:
-                self.get_logger().error(f"Failed to load processor for {dataset_name}: {str(e)}")
+                self.get_logger().error(f"Failed to load processor for {dataset_name}: {e}")
                 raise
 
-    def setup_subscriptions(self):
-        topic_names = [ v['topic'] for _, v in self.config['datasets'].items() ]
+    def setup_subscriptions(self) -> None:
+        topic_names = [v['topic'] for v in self.config['datasets'].values()]
         topic_configs = {
-            topic_name: topic_cfg
-            for topic_name, topic_cfg in self.config['topics'].items()
-            if topic_name in topic_names
+            t: self.config['topics'][t]
+            for t in self.config['topics']
+            if t in topic_names
         }
-
-        # Create QoS profiles
-        # Use RELIABLE for /YAM_VR_L and /YAM_VR_R to match publishers (yam_cmd_pub uses default RELIABLE QoS)
-        qos_profile_reliable = QoSProfile(
+        qos_reliable = QoSProfile(
             reliability=ReliabilityPolicy.RELIABLE,
             history=HistoryPolicy.KEEP_LAST,
-            depth=1
+            depth=1,
         )
-        
-        # Use BEST_EFFORT for other high-frequency topics (e.g., images, status)
-        qos_profile_best_effort = QoSProfile(
+        qos_best_effort = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
             history=HistoryPolicy.KEEP_LAST,
-            depth=1
+            depth=1,
         )
-        
         for topic_name, topic_cfg in topic_configs.items():
             msg_module, msg_type = topic_cfg['msg_type'].rsplit('.', 1)
             module = importlib.import_module(msg_module)
             msg_class = getattr(module, msg_type)
-
-            # Use RELIABLE QoS for arm command topics, BEST_EFFORT for others
-            if topic_name in ['/YAM_VR_L', '/YAM_VR_R']:
-                qos_profile = qos_profile_reliable
-            else:
-                qos_profile = qos_profile_best_effort
-
+            qos = qos_reliable if topic_name in ('/YAM_VR_L', '/YAM_VR_R') else qos_best_effort
             self.create_subscription(
-                msg_class,
-                topic_name,
-                self.create_callback(topic_name),
-                qos_profile
+                msg_class, topic_name,
+                self._make_callback(topic_name),
+                qos,
             )
+            self.get_logger().info(f"subscribed: {topic_name}")
 
-            self.get_logger().info(f"create sub {topic_name}")
-
-    def create_callback(self, topic_name):
+    def _make_callback(self, topic_name: str):
         def callback(msg):
-            stamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+            if hasattr(msg, 'header') and msg.header is not None:
+                stamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+            else:
+                stamp = self.get_clock().now().nanoseconds / 1e-9
             with self.locks[topic_name]:
                 self.buffers[topic_name].append((stamp, msg))
-                max_q = self.config['max_queue_size']
-                if len(self.buffers[topic_name]) > max_q:
+                if len(self.buffers[topic_name]) > self.config['max_queue_size']:
                     self.buffers[topic_name].pop(0)
-
         return callback
 
+    def _open_streaming_hdf5(self, file_path: str) -> None:
+        """Create HDF5 file and extendable datasets for streaming write."""
+        self.h5_file = h5py.File(file_path, 'w')
+        self.h5_datasets = {}
+        elem_shapes = {k: tuple(cfg['shape']) for k, cfg in self.dataset_cfg_dict.items()}
+        dtypes = {k: cfg['dtype'] for k, cfg in self.dataset_cfg_dict.items()}
+        for dataset_name, cfg in self.dataset_cfg_dict.items():
+            elem_shape = tuple(cfg['shape'])
+            # (0, *elem_shape) + maxshape (None, *elem_shape) for append
+            ds = self.h5_file.create_dataset(
+                dataset_name,
+                shape=(0,) + elem_shape,
+                maxshape=(None,) + elem_shape,
+                dtype=cfg['dtype'],
+                chunks=(1,) + elem_shape,
+            )
+            ds.attrs['description'] = cfg['description']
+            self.h5_datasets[dataset_name] = ds
+        self.streaming_frame_count = 0
+        self.get_logger().info(f"Streaming HDF5 opened: {file_path}")
+
+    def _write_streaming_frame(self, processed_data_dict: Dict[str, np.ndarray]) -> None:
+        """Append one frame to streaming HDF5 datasets."""
+        with self._h5_lock:
+            if self.h5_file is None:
+                return
+            n = self.streaming_frame_count
+            for name, data in processed_data_dict.items():
+                ds = self.h5_datasets.get(name)
+                if ds is None:
+                    continue
+                ds.resize((n + 1,) + tuple(self.dataset_cfg_dict[name]['shape']))
+                ds[n] = data
+            self.streaming_frame_count = n + 1
+
+    def _close_streaming_hdf5(self) -> str | None:
+        """Write metadata, close file; return path or None."""
+        with self._h5_lock:
+            if self.h5_file is None:
+                return None
+            path = self.h5_file.filename
+            self.h5_file.create_dataset(
+                'collection_frequency',
+                data=np.array(self.config['collection_frequency'], dtype='f'),
+            )
+            self.h5_file.create_dataset(
+                'robot_number',
+                data=np.array(self.config['robot_number'], dtype='f'),
+            )
+            self.h5_file.close()
+            self.h5_file = None
+            self.h5_datasets = {}
+            self.get_logger().info(f"Streaming HDF5 closed: {path} ({self.streaming_frame_count} frames)")
+            return path
+
     def start_callback(self, request, response):
-        # request is empty for Trigger
         if self.is_collecting:
             response.success = False
-            response.message = "Already collecting data"
+            response.message = "Already collecting"
             return response
-
-        # Get frequency from parameters instead of request
         frequency = self.config['collection_frequency']
         interval = 1.0 / frequency
-
         self.is_collecting = True
-        self.timer = self.create_timer(interval, self.collect_data)
 
+        if self.use_streaming:
+            data_dir = self.config['data_dir']
+            timestamp = int(time.time())
+            file_path = os.path.join(data_dir, f'collection_{timestamp}.hdf5')
+            try:
+                self._open_streaming_hdf5(file_path)
+            except Exception as e:
+                self.is_collecting = False
+                response.success = False
+                response.message = f"Failed to open streaming HDF5: {e}"
+                return response
+        else:
+            self.collected_dataset_list = []
+
+        self.timer = self.create_timer(interval, self.collect_data)
         response.success = True
-        response.message = f"Started collecting at {frequency}Hz"
+        response.message = f"Started collecting at {frequency}Hz (streaming={self.use_streaming})"
         return response
 
     def stop_callback(self, request, response):
         if not self.is_collecting:
             response.success = False
-            response.message = "Not currently collecting"
+            response.message = "Not collecting"
             return response
-
         self.is_collecting = False
         if self.timer:
             self.timer.cancel()
+            self.timer = None
 
         try:
-            start_time = time.time()
-            file_path = self.save_data()
-            delta_time = time.time() - start_time
-            self.get_logger().info(f"save time cost: {delta_time}")
-            del self.collected_dataset_list
-            self.collected_dataset_list = []
-            response.success = True
-            response.message = f"Data saved to {file_path}"
+            if self.use_streaming:
+                file_path = self._close_streaming_hdf5()
+                response.success = True
+                response.message = f"Data saved to {file_path}" if file_path else "Streaming file closed"
+            else:
+                start_time = time.time()
+                file_path = self._save_batch_data()
+                response.success = True
+                response.message = f"Data saved to {file_path}"
+                self.get_logger().info(f"save time: {time.time() - start_time:.2f}s")
+                self.collected_dataset_list = []
         except Exception as e:
             response.success = False
             response.message = str(e)
-
+            self.get_logger().error(str(e))
         return response
 
-    def collect_data(self):
-        current_time = self.get_clock().now().nanoseconds / 1e9
+    def collect_data(self) -> None:
+        current_time = self.get_clock().now().nanoseconds / 1e-9
         processed_data_dict = {}
         max_age = self.config['max_age']
 
@@ -210,122 +272,95 @@ class DataCollector(Node):
             with self.locks[topic_name]:
                 buffer = self.buffers[topic_name]
                 if not buffer:
-                    self.raise_error(f"No data in {topic_name}")
+                    self._raise_error(f"No data in {topic_name}")
                     return
-                
                 stamps = [s for s, _ in buffer]
                 idx = bisect_left(stamps, current_time)
-                closest = self.find_closest(stamps, idx, current_time)
-
+                closest = self._find_closest(stamps, idx, current_time)
                 if closest is None:
-                    self.raise_error(f"No closet data in {topic_name}")
-
-                delta_time = abs(buffer[closest][0] - current_time)
-                self.get_logger().info(f"topic: {topic_name}, delta time: {delta_time}")
-                if delta_time > max_age:
-                    self.raise_error(f"Stale data in {topic_name}, delta time: {delta_time}")
+                    self._raise_error(f"No closest data in {topic_name}")
                     return
-
+                delta_time = abs(buffer[closest][0] - current_time)
+                if delta_time > max_age:
+                    self._raise_error(f"Stale data in {topic_name}, delta={delta_time}")
+                    return
                 _, msg = buffer[closest]
                 processed_data_dict[dataset_name] = self.processors[dataset_name].process(msg)
-
-                message = self.processors[dataset_name].get_message()
-                if message != '':
-                    self.get_logger().warn('*'*50)
-                    self.get_logger().warn(message)
-                    self.get_logger().warn('*'*50)
-
-                # always save one frame at least in buffer
+                msg_out = self.processors[dataset_name].get_message()
+                if msg_out:
+                    self.get_logger().warn(msg_out)
                 self.buffers[topic_name] = buffer[closest:]
 
-        self.collected_dataset_list.append(processed_data_dict)
-
-        time_cost = self.get_clock().now().nanoseconds / 1e9 - current_time
-        time_interval = 1.0 / self.config['collection_frequency']
-
-        if time_cost > time_interval:
-            self.get_logger().warn(f"collect_data time cost: {time_cost}, !!!!!costing too much time!!!!!")
+        if self.use_streaming:
+            self._write_streaming_frame(processed_data_dict)
         else:
-            self.get_logger().info(f"collect_data time cost: {time_cost}")
+            self.collected_dataset_list.append(processed_data_dict)
 
-    def save_data(self):
+        elapsed = self.get_clock().now().nanoseconds / 1e-9 - current_time
+        interval = 1.0 / self.config['collection_frequency']
+        if elapsed > interval:
+            self.get_logger().warn(f"collect_data took {elapsed:.3f}s (>{interval:.3f}s)")
+        else:
+            self.get_logger().info(f"collect_data took {elapsed:.3f}s")
+
+    def _save_batch_data(self) -> str:
+        """Batch mode: write collected_dataset_list to a new HDF5 file."""
         data_dir = self.config['data_dir']
         os.makedirs(data_dir, exist_ok=True)
         timestamp = int(time.time())
         file_path = os.path.join(data_dir, f'collection_{timestamp}.hdf5')
-        self.get_logger().info(f"saving to {file_path}")
+        self.get_logger().info(f"Saving batch to {file_path}")
 
         with h5py.File(file_path, 'w') as hf:
-            # First create all datasets and store references
-            hdf5_dataset_dict = {}
-            for dataset_name, dataset_cfg in self.dataset_cfg_dict.items():
-                shape = (len(self.collected_dataset_list), *dataset_cfg['shape'])
-
-                self.get_logger().info(f"{dataset_name} save shape: {shape}")
-
-                # Create dataset with full save path
-                dataset = hf.create_dataset(
+            n_frames = len(self.collected_dataset_list)
+            for dataset_name, cfg in self.dataset_cfg_dict.items():
+                shape = (n_frames,) + tuple(cfg['shape'])
+                ds = hf.create_dataset(
                     dataset_name,
                     shape,
-                    dtype=dataset_cfg['dtype'],
-                    chunks=(1, *dataset_cfg['shape'])
+                    dtype=cfg['dtype'],
+                    chunks=(1,) + tuple(cfg['shape']),
                 )
-                dataset.attrs['description'] = dataset_cfg['description']
-                hdf5_dataset_dict[dataset_name] = dataset
-
-                self.get_logger().info(f"{dataset_name} dataset: {dataset}")
-
-            # Then write data to pre-created datasets
-            for i, collected_dataset_dict in enumerate(self.collected_dataset_list):
-                for collected_dataset_name, collected_dataset_data in collected_dataset_dict.items():
-                    if i == 0:
-                        if hasattr(collected_dataset_data, 'shape'):
-                            self.get_logger().info(f"{collected_dataset_name} data shape: {collected_dataset_data.shape}")
-                        else:
-                            self.get_logger().info(f"{collected_dataset_name} data : {collected_dataset_data}")
-                    hdf5_dataset = hdf5_dataset_dict[collected_dataset_name]
-                    hdf5_dataset[i] = collected_dataset_data
-
-            hf.create_dataset(
-                'collection_frequency',
-                data=self.config['collection_frequency'],
-                dtype='f'
-            )
-
-            hf.create_dataset(
-            'robot_number',
-                data=self.config['robot_number'],
-                dtype='f'
-            )
-
-        self.get_logger().info(f"saved to {file_path}")
-
+                ds.attrs['description'] = cfg['description']
+                for i, frame in enumerate(self.collected_dataset_list):
+                    if dataset_name in frame:
+                        ds[i] = frame[dataset_name]
+            hf.create_dataset('collection_frequency', data=np.array(self.config['collection_frequency'], dtype='f'))
+            hf.create_dataset('robot_number', data=np.array(self.config['robot_number'], dtype='f'))
+        self.get_logger().info(f"Saved {n_frames} frames to {file_path}")
         return file_path
 
-    def find_closest(self, stamps, idx, target):
+    @staticmethod
+    def _find_closest(stamps: List[float], idx: int, target: float) -> int | None:
         if idx == 0:
             return 0 if stamps else None
-        elif idx == len(stamps):
-            return idx - 1
-        else:
-            before = stamps[idx - 1]
-            after = stamps[idx]
-            return idx - 1 if (target - before) <= (after - target) else idx
+        if idx >= len(stamps):
+            return len(stamps) - 1
+        before, after = stamps[idx - 1], stamps[idx]
+        return idx - 1 if (target - before) <= (after - target) else idx
 
-    def raise_error(self, msg):
+    def _raise_error(self, msg: str) -> None:
         self.get_logger().error(msg)
         self.is_collecting = False
         if self.timer:
-            self.destroy_timer(self.timer)
+            self.timer.cancel()
+            self.timer = None
         raise RuntimeError(msg)
 
 
 def main(args=None):
     rclpy.init(args=args)
     node = DataCollector()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    finally:
+        if node.h5_file is not None:
+            try:
+                node.h5_file.close()
+            except Exception:
+                pass
+        node.destroy_node()
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':

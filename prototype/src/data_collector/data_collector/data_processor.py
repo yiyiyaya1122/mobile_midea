@@ -2,7 +2,7 @@ from typing import Dict, Any, List
 from cv_bridge import CvBridge
 import numpy as np
 import cv2
-from robot_msgs.msg import RobotCmd, RobotStatus, YamCmd, YamStatus
+from robot_msgs.msg import RobotCmd, RobotStatus, YamCmd, YamStatus, Quest2Button
 from geometry_msgs.msg import Twist
 
 class DataProcessor:
@@ -106,6 +106,31 @@ class OdomProcessor(DataProcessor):
         twist = msg.twist
         angular_linear = [twist.angular.x, twist.angular.y, twist.angular.z, twist.linear.x, twist.linear.y, twist.linear.z]
         return np.array(angular_linear)
+
+
+class PoseStampedProcessor(DataProcessor):
+    """PoseStamped -> [x, y, z, qx, qy, qz, qw] for HDF5."""
+    def process(self, msg):
+        p = msg.pose.position
+        q = msg.pose.orientation
+        return np.array([p.x, p.y, p.z, q.x, q.y, q.z, q.w], dtype=np.float64)
+
+
+class Quest2ButtonProcessor(DataProcessor):
+    """Quest2Button -> 12 button flags (0/1) + 8 analog values = 20 float64."""
+    def process(self, msg: Quest2Button):
+        buttons = [
+            float(msg.a), float(msg.b), float(msg.x), float(msg.y),
+            float(msg.r_thu), float(msg.rj), float(msg.rg), float(msg.rtr),
+            float(msg.l_thu), float(msg.lj), float(msg.lg), float(msg.ltr),
+        ]
+        analog = [
+            msg.left_joystick[0], msg.left_joystick[1],
+            msg.left_trigger, msg.left_grip,
+            msg.right_joystick[0], msg.right_joystick[1],
+            msg.right_trigger, msg.right_grip,
+        ]
+        return np.array(buttons + analog, dtype=np.float64)
 
 
 class PedalProcessor(DataProcessor):

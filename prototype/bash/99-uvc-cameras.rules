@@ -1,3 +1,8 @@
+# 左臂相机：支持多个 USB 口（插拔后端口号可能变化，多写几条以覆盖 4.2~4.6）
+SUBSYSTEM=="video4linux", ATTRS{serial}=="200901010002", ENV{ID_PATH}=="pci-0000:00:14.0-usb-0:4.2:1.0", ENV{ID_V4L_CAPABILITIES}==":capture:", MODE="0777", SYMLINK+="uvc_camera/camera_left"
+SUBSYSTEM=="video4linux", ATTRS{serial}=="200901010002", ENV{ID_PATH}=="pci-0000:00:14.0-usb-0:4.3:1.0", ENV{ID_V4L_CAPABILITIES}==":capture:", MODE="0777", SYMLINK+="uvc_camera/camera_left"
 SUBSYSTEM=="video4linux", ATTRS{serial}=="200901010002", ENV{ID_PATH}=="pci-0000:00:14.0-usb-0:4.4:1.0", ENV{ID_V4L_CAPABILITIES}==":capture:", MODE="0777", SYMLINK+="uvc_camera/camera_left"
+SUBSYSTEM=="video4linux", ATTRS{serial}=="200901010002", ENV{ID_PATH}=="pci-0000:00:14.0-usb-0:4.5:1.0", ENV{ID_V4L_CAPABILITIES}==":capture:", MODE="0777", SYMLINK+="uvc_camera/camera_left"
+SUBSYSTEM=="video4linux", ATTRS{serial}=="200901010002", ENV{ID_PATH}=="pci-0000:00:14.0-usb-0:4.6:1.0", ENV{ID_V4L_CAPABILITIES}==":capture:", MODE="0777", SYMLINK+="uvc_camera/camera_left"
 SUBSYSTEM=="video4linux", ATTRS{serial}=="200901010002", ENV{ID_PATH}=="pci-0000:00:14.0-usb-0:4.1:1.0", ENV{ID_V4L_CAPABILITIES}==":capture:", MODE="0777", SYMLINK+="uvc_camera/camera_right"
 SUBSYSTEM=="video4linux", ATTRS{serial}=="200901010002", ENV{ID_PATH}=="pci-0000:00:14.0-usb-0:2:1.0", ENV{ID_V4L_CAPABILITIES}==":capture:", MODE="0777", SYMLINK+="uvc_camera/camera_top"

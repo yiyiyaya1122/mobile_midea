@@ -18,11 +18,6 @@ QUEST_DIR="$MOBILE_MIDEA_DIR/quest"
 PROTOTYPE_DIR="$MOBILE_MIDEA_DIR/prototype"
 QUICK_START_DIR="$MOBILE_MIDEA_DIR/quick_start"
 
-CONFIG_CAN=true
-START_VR=true
-START_ARM=true
-START_DATA=true
-
 # ===================== 依赖检查 =====================
 command -v tmux >/dev/null || { echo "❌ tmux 未安装"; exit 1; }
 command -v pixi >/dev/null || { echo "❌ pixi 未安装"; exit 1; }
@@ -42,7 +37,6 @@ tmux new-session -d -s "$SESSION_NAME" -n robot
 # 目标布局：3行2列
 # 左列：CAN(0) | ARM(2) | Camera(4)
 # 右列：DATA(1) | VR(3) | Rviz2(5)
-# 注意：pane编号由split顺序决定
 
 # 创建左右两列
 tmux split-window -h -t "$SESSION_NAME:robot"     # 水平分割：0(左), 1(右)
@@ -58,7 +52,7 @@ tmux split-window -v -t "$SESSION_NAME:robot.3"    # 右列再分割：1(右上)
 # 调整 pane 大小 - 使用 tiled 布局确保所有面板大小完全一致
 tmux select-layout -t "$SESSION_NAME:robot" tiled
 
-# ===================== galaxea_robot_startup pane=====================
+# ===================== CAN + galaxea_robot_startup pane =====================
 tmux send-keys -t "$SESSION_NAME:robot.0" "
 set +x
 tmux select-pane -T 'CAN'
@@ -74,7 +68,6 @@ exec bash
 " C-m
 
 # ===================== DATA_COLLECTOR pane =====================
-# 注意：根据split顺序，DATA在pane 1（右列上）
 tmux send-keys -t "$SESSION_NAME:robot.1" "
 set +x
 tmux select-pane -T 'DATA_COLLECTOR'
@@ -88,7 +81,6 @@ exec bash
 " C-m
 
 # ===================== ARM pane =====================
-# 注意：根据split顺序，ARM在pane 2（左列中）
 tmux send-keys -t "$SESSION_NAME:robot.2" "
 set +x
 tmux select-pane -T 'ARM…'
@@ -106,7 +98,6 @@ exec bash
 " C-m
 
 # ===================== VR pane =====================
-# 注意：根据split顺序，VR在pane 3（右列中）
 tmux send-keys -t "$SESSION_NAME:robot.3" "
 set +x
 tmux select-pane -T 'VR…'
@@ -123,13 +114,10 @@ exec bash
 " C-m
 
 # ===================== Camera pane =====================
-# 注意：根据split顺序，Camera在pane 4（左列下，高度较小）
 tmux send-keys -t "$SESSION_NAME:robot.4" "
 set +x
 tmux select-pane -T 'CAMERA'
 cd $PROTOTYPE_DIR || exit 1
-
-# 启动 UVC cameras
 source install/setup.bash
 ./scripts/uvc_cameras.py
 
@@ -137,7 +125,6 @@ exec bash
 " C-m
 
 # ===================== Rviz2 pane =====================
-# 注意：根据split顺序，Rviz2在pane 5（右列下，高度较小）
 tmux send-keys -t "$SESSION_NAME:robot.5" "
 set +x
 tmux select-pane -T 'RVIZ2'
