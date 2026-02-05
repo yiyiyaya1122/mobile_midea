@@ -90,6 +90,12 @@ class JointCurrentProcessor(DataProcessor):
         return np.array(msg.joint_cur)
 
 
+class YamCmdEndPoseProcessor(DataProcessor):
+    """YamCmd -> end_pose[7] (x y z w x y z), i.e. commanded robot end-effector pose in norm frame."""
+    def process(self, msg: YamCmd):
+        return np.array(msg.end_pose, dtype=np.float64)
+
+
 class TwistProcessor(DataProcessor):
     def process(self, msg):
         # TwistStamped structure: header + twist (Twist type)
