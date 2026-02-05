@@ -181,3 +181,4 @@ tmux attach -t r1lite_collect
 - **“tmux session 已存在”**：先结束旧会话再启动，例如 `tmux kill-server`。
 - **采集/回放中 CAN 或底盘未就绪**：确认已执行对应 CAN 脚本（脚本内会自动执行），并确认 `galaxea_robot_startup.sh` 路径与 Galaxea 安装一致。
 - **VR 窗格报错**：检查 Quest 与 ADB 连接，必要时在 quest 目录执行 `bash bash/adb.sh`。
+- **VR 可以操控机械臂但无法操控躯干和底盘**： 1. 查看 `HDAS` 模块是否掉线,电量过低会导致 `HDAS` 模块掉线, 此时需充电并重启  2. 通过 `ip link list` 查看 `can0` 是否掉线, 运行 `bash frist_start/install.sh` 重装驱动

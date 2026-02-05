@@ -9,8 +9,12 @@ PASSWORD="${PASSWORD:-1}"
 
 # 配置 can0
 echo "$PASSWORD" | sudo -S ip link set down can0 2>/dev/null || true
-echo "$PASSWORD" | sudo -S ip link set can0 type can bitrate 1000000 sample-point 0.875 dbitrate 5000000 fd on dsample-point 0.875 2>/dev/null || true
+echo "$PASSWORD" | sudo -S ip link set can0 type can \
+    bitrate 1000000 sample-point 0.875 \
+    dbitrate 5000000 fd on dsample-point 0.875 \
+    2>/dev/null || true
 echo "$PASSWORD" | sudo -S ip link set up can0 2>/dev/null || true
+sleep 0.5
 
 # 验证配置
 echo ''
