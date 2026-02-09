@@ -122,6 +122,40 @@ datasets:
       dtype: "float64"
       description: "Torso velocity (angular xyz + linear xyz)"
 
+  # Commanded end-effector pose (for arm_replay_mode=end_pose); optional, use if HDF5 has them
+  "/state/end_pose/left":
+    topic: "/YAM_VR_L"
+    processor: "data_collector.data_processor.YamCmdEndPoseProcessor"
+    processor_config:
+      output_shape: [7]
+      dtype: "float64"
+      description: "Left arm commanded end-effector pose (x y z x y z w)"
+
+  "/state/end_pose/right":
+    topic: "/YAM_VR_R"
+    processor: "data_collector.data_processor.YamCmdEndPoseProcessor"
+    processor_config:
+      output_shape: [7]
+      dtype: "float64"
+      description: "Right arm commanded end-effector pose (x y z x y z w)"
+
+  # Commanded gripper (for end_pose replay gripper control); optional
+  "/state/gripper_cmd/left":
+    topic: "/YAM_VR_L"
+    processor: "data_collector.data_processor.YamCmdGripperProcessor"
+    processor_config:
+      output_shape: [1]
+      dtype: "float64"
+      description: "Left arm commanded gripper"
+
+  "/state/gripper_cmd/right":
+    topic: "/YAM_VR_R"
+    processor: "data_collector.data_processor.YamCmdGripperProcessor"
+    processor_config:
+      output_shape: [1]
+      dtype: "float64"
+      description: "Right arm commanded gripper"
+
 
 topics:
 
@@ -180,3 +214,11 @@ topics:
   "/motion_target/target_speed_torso":
     msg_type: "geometry_msgs.msg.TwistStamped"
     description: "Torso velocity"
+
+  "/YAM_VR_L":
+    msg_type: "robot_msgs.msg.YamCmd"
+    description: "Left arm command (for replay end_pose mode)"
+
+  "/YAM_VR_R":
+    msg_type: "robot_msgs.msg.YamCmd"
+    description: "Right arm command (for replay end_pose mode)"

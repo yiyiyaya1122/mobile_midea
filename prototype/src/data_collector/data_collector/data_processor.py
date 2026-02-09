@@ -91,9 +91,17 @@ class JointCurrentProcessor(DataProcessor):
 
 
 class YamCmdEndPoseProcessor(DataProcessor):
-    """YamCmd -> end_pose[7] (x y z w x y z), i.e. commanded robot end-effector pose in norm frame."""
+    """YamCmd -> end_pose[7] (x y z x y z w), i.e. position xyz + quaternion xyzw, commanded in norm frame."""
     def process(self, msg: YamCmd):
-        return np.array(msg.end_pose, dtype=np.float64)
+        # YamCmd.end_pose is x y z w x y z; save as x y z x y z w (position + quat xyzw)
+        p = msg.end_pose
+        return np.array([p[0], p[1], p[2], p[4], p[5], p[6], p[3]], dtype=np.float64)
+
+
+class YamCmdGripperProcessor(DataProcessor):
+    """YamCmd -> gripper (1 float), i.e. commanded gripper value from VR."""
+    def process(self, msg: YamCmd):
+        return np.array([msg.gripper], dtype=np.float64) / 5.0 # normalized gripper value
 
 
 class TwistProcessor(DataProcessor):

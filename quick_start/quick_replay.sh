@@ -22,16 +22,23 @@ DEFAULT_HDF5_FILE=""
 DEFAULT_CONFIG_PATH="$PROTOTYPE_DIR/src/inference/config/replay_config.yaml"
 DEFAULT_LOOP="false"
 DEFAULT_ARM_TYPE="yam"
+DEFAULT_ARM_REPLAY_MODE="end_pose"
 
 # ===================== 参数解析 =====================
 HDF5_FILE="${1:-$DEFAULT_HDF5_FILE}"
 CONFIG_PATH="${2:-$DEFAULT_CONFIG_PATH}"
 LOOP="${3:-$DEFAULT_LOOP}"
 ARM_TYPE="${4:-$DEFAULT_ARM_TYPE}"
+ARM_REPLAY_MODE="${5:-$DEFAULT_ARM_REPLAY_MODE}"
 
 # 验证 arm_type
 if [ "$ARM_TYPE" != "yam" ] && [ "$ARM_TYPE" != "arx" ]; then
     echo "❌ 错误: arm_type 必须是 'yam' 或 'arx'"
+    exit 1
+fi
+# 验证 arm_replay_mode
+if [ "$ARM_REPLAY_MODE" != "joint" ] && [ "$ARM_REPLAY_MODE" != "end_pose" ]; then
+    echo "❌ 错误: arm_replay_mode 必须是 'joint' 或 'end_pose'"
     exit 1
 fi
 
@@ -39,17 +46,18 @@ fi
 if [ -z "$HDF5_FILE" ] || [ ! -f "$HDF5_FILE" ]; then
     echo "❌ 错误: HDF5 文件未指定或不存在"
     echo ""
-    echo "用法: $0 <hdf5_file> [config_path] [loop] [arm_type]"
+    echo "用法: $0 <hdf5_file> [config_path] [loop] [arm_type] [arm_replay_mode]"
     echo ""
     echo "参数说明:"
-    echo "  hdf5_file   : HDF5 数据文件路径（必需）"
-    echo "  config_path : 数据回放配置文件路径（可选，默认: $DEFAULT_CONFIG_PATH）"
-    echo "  loop        : 是否循环播放（可选，默认: false）"
-    echo "  arm_type    : 机械臂类型（可选，默认: yam，可选: yam 或 arx）"
+    echo "  hdf5_file       : HDF5 数据文件路径（必需）"
+    echo "  config_path     : 数据回放配置文件路径（可选，默认: $DEFAULT_CONFIG_PATH）"
+    echo "  loop            : 是否循环播放（可选，默认: false）"
+    echo "  arm_type        : 机械臂类型（可选，默认: yam，可选: yam 或 arx）"
+    echo "  arm_replay_mode : 臂控制模式（可选，默认: end_pose），joint=关节角 / end_pose=末端位姿（仅 yam）"
     echo ""
     echo "示例:"
     echo "  $0 /path/to/collection_1234567890.hdf5"
-    echo "  $0 /path/to/collection_1234567890.hdf5 \$CONFIG_PATH true yam"
+    echo "  $0 /path/to/collection_1234567890.hdf5 \$CONFIG_PATH true yam end_pose"
     exit 1
 fi
 
@@ -63,6 +71,7 @@ echo "  HDF5 文件: $HDF5_FILE"
 echo "  配置文件: $CONFIG_PATH"
 echo "  循环播放: $LOOP"
 echo "  机械臂类型: $ARM_TYPE"
+echo "  臂控制模式: $ARM_REPLAY_MODE"
 echo ""
 
 # ===================== 依赖检查 =====================
@@ -128,7 +137,8 @@ pixi run ros2 launch inference data_replay.launch.py \
     hdf5_file:=$HDF5_FILE \
     config_path:=$CONFIG_PATH \
     loop:=$LOOP \
-    arm_type:=$ARM_TYPE
+    arm_type:=$ARM_TYPE \
+    arm_replay_mode:=$ARM_REPLAY_MODE
 
 exec bash
 " C-m

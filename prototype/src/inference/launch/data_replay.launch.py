@@ -46,7 +46,13 @@ def generate_launch_description():
         default_value='yam',
         description='Arm type: yam or arx'
     )
-    
+
+    arm_replay_mode_arg = DeclareLaunchArgument(
+        'arm_replay_mode',
+        default_value='end_pose',
+        description='Arm replay mode: joint (joint angle) or end_pose (end-effector pose, yam only)'
+    )
+
     # Create node
     replay_node = Node(
         package='inference',
@@ -58,13 +64,15 @@ def generate_launch_description():
             'config_path': LaunchConfiguration('config_path'),
             'loop': LaunchConfiguration('loop'),
             'arm_type': LaunchConfiguration('arm_type'),
+            'arm_replay_mode': LaunchConfiguration('arm_replay_mode'),
         }]
     )
-    
+
     return LaunchDescription([
         hdf5_file_arg,
         config_path_arg,
         loop_arg,
         arm_type_arg,
+        arm_replay_mode_arg,
         replay_node,
     ])

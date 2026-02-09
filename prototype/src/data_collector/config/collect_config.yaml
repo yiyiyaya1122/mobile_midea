@@ -129,7 +129,7 @@ datasets:
     processor_config:
       output_shape: [7]
       dtype: "float64"
-      description: "Left arm commanded end-effector pose (x y z w x y z)"
+      description: "Left arm commanded end-effector pose (x y z x y z w)"
 
   "/state/end_pose/right":
     topic: "/YAM_VR_R"
@@ -137,7 +137,24 @@ datasets:
     processor_config:
       output_shape: [7]
       dtype: "float64"
-      description: "Right arm commanded end-effector pose (x y z w x y z)"
+      description: "Right arm commanded end-effector pose (x y z x y z w)"
+
+  # Commanded gripper from YamCmd (same source as end_pose)
+  "/state/gripper_cmd/left":
+    topic: "/YAM_VR_L"
+    processor: "data_collector.data_processor.YamCmdGripperProcessor"
+    processor_config:
+      output_shape: [1]
+      dtype: "float64"
+      description: "Left arm commanded gripper from VR"
+
+  "/state/gripper_cmd/right":
+    topic: "/YAM_VR_R"
+    processor: "data_collector.data_processor.YamCmdGripperProcessor"
+    processor_config:
+      output_shape: [1]
+      dtype: "float64"
+      description: "Right arm commanded gripper from VR"
 
 
 topics:
