@@ -30,6 +30,7 @@ class DataReplayNode(Node):
         self.declare_parameter('loop', False)
         self.declare_parameter('arm_type', 'yam')
         self.declare_parameter('arm_replay_mode', 'end_pose')
+        self.declare_parameter('replay_frequency', 0)  # Hz; 0 = use config's collection_frequency (int from launch)
 
         self.hdf5_file = self.get_parameter('hdf5_file').value
         self.config_path = self.get_parameter('config_path').value
@@ -62,7 +63,9 @@ class DataReplayNode(Node):
                 self.data[name] = self.hf[name][:]
                 self.num_frames = max(self.num_frames, len(self.data[name]))
 
-        self.frequency = self.config.get('collection_frequency', 50.0)
+        freq_param = self.get_parameter('replay_frequency').value
+        self.frequency = float(freq_param) if (isinstance(freq_param, (int, float)) and float(freq_param) > 0) else self.config.get('collection_frequency', 50.0)
+        self.get_logger().info(f"Replay frequency: {self.frequency} Hz")
 
         # 发布器
         self.topic_publishers = {}

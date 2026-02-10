@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 """
-Convert between joint_position and end_pose for YAM and ARX arms.
-Supports HDF5 (e.g. from data_collector) and CSV.
+Convert between joint_position and end_pose for YAM and ARX arms (HDF5 only).
 
 Usage:
-  # HDF5: joint -> end_pose
+  # joint -> end_pose
   python joint_pose_convert.py --arm yam --mode joint2pose --input bag.hdf5 --output poses.hdf5 \\
       [--dataset-in /state/joint_position/left] [--dataset-out /state/end_pose/left]
 
-  # HDF5: end_pose -> joint
+  # end_pose -> joint
   python joint_pose_convert.py --arm yam --mode pose2joint --input bag.hdf5 --output joints.hdf5 \\
       [--dataset-in /state/end_pose/left] [--dataset-out /state/joint_position/left]
 
-  # CSV
-  python joint_pose_convert.py --arm arx --mode joint2pose --input joints.csv --output poses.csv [--format csv]
+  # both arms in one run
+  python joint_pose_convert.py --arm yam --mode joint2pose --input bag.hdf5 --output poses.hdf5 --sides both
+
+  # Copy all other data from input to output (default). Use --no-copy-remaining to write only converted dataset(s).
+  python joint_pose_convert.py --arm yam --mode joint2pose --input bag.hdf5 --output out.hdf5 --sides both
 
 Pose format: x y z qx qy qz qw (7 values), matching collect_config end_pose.
 Joint format: 6 values (rad) for FK/IK; input may have 7 (first 6 used for YAM).
@@ -65,17 +67,26 @@ YAM_EEF_FRAME = "link_6"
 
 
 def _yam_fk_model(urdf_path):
+    """Build YAM model and return (model, data, eef_id, eef_pos, base2eef_mat).
+    eef_pos and base2eef_mat are at neutral config, for norm-frame transform (match YamFun)."""
     import pinocchio as pin
+    from scipy.spatial.transform import Rotation
     model = pin.buildModelFromUrdf(urdf_path)
     data = pin.Data(model)
     if not model.existFrame(YAM_EEF_FRAME):
         raise ValueError(f"Frame '{YAM_EEF_FRAME}' not found in URDF.")
     eef_id = model.getFrameId(YAM_EEF_FRAME)
-    return model, data, eef_id
+    q_neutral = pin.neutral(model)
+    pin.forwardKinematics(model, data, q_neutral)
+    pin.updateFramePlacement(model, data, eef_id)
+    eef_pose = data.oMf[eef_id]
+    eef_pos = np.array(eef_pose.translation, copy=True)
+    base2eef_mat = np.array(eef_pose.rotation, copy=True)
+    return model, data, eef_id, eef_pos, base2eef_mat
 
 
-def yam_joint_to_pose(q_row, model, data, eef_id):
-    """Single row: 6 or 7 joint values (rad). Returns 7 pose (x y z qx qy qz qw)."""
+def yam_joint_to_pose(q_row, model, data, eef_id, eef_pos, base2eef_mat):
+    """Single row: 6 or 7 joint values (rad). Returns 7 pose in NORM frame (x y z qx qy qz qw), matching YamController."""
     import pinocchio as pin
     from scipy.spatial.transform import Rotation
     nq = model.nq
@@ -87,23 +98,27 @@ def yam_joint_to_pose(q_row, model, data, eef_id):
     pin.forwardKinematics(model, data, q)
     pin.updateFramePlacement(model, data, eef_id)
     T = data.oMf[eef_id]
-    R = T.rotation
-    p = T.translation
-    r = Rotation.from_matrix(R)
+    # Norm frame: position = base_pos - eef_pos, orientation = R_base @ base2eef_mat.T (match computeEEFinNorm)
+    p_norm = np.array(T.translation) - eef_pos
+    R_norm = T.rotation @ base2eef_mat.T
+    r = Rotation.from_matrix(R_norm)
     quat = r.as_quat()  # xyzw
-    return np.concatenate([p, quat])
+    return np.concatenate([p_norm, quat])
 
 
-def yam_pose_to_joint(pose_row, model, data, eef_id, q_init=None):
-    """Single row: 7 pose (x y z qx qy qz qw). Returns nq joint angles (rad)."""
+def yam_pose_to_joint(pose_row, model, data, eef_id, eef_pos, base2eef_mat, q_init=None):
+    """Single row: 7 pose in NORM frame (x y z qx qy qz qw). Returns nq joint angles (rad)."""
     import pinocchio as pin
+    from scipy.spatial.transform import Rotation
     pose = np.asarray(pose_row, dtype=np.float64).ravel()
     if pose.size != 7:
         raise ValueError("Pose must have 7 elements (x y z qx qy qz qw)")
-    quat, p = pose[3:7], pose[:3]
-    from scipy.spatial.transform import Rotation
-    Rmat = Rotation.from_quat(quat).as_matrix()
-    oMf_des = pin.SE3(Rmat, p)
+    p_norm, quat = pose[:3], pose[3:7]
+    R_norm = Rotation.from_quat(quat).as_matrix()
+    # Norm -> base for IK: p_base = p_norm + eef_pos, R_base = R_norm @ base2eef_mat (match computeIK)
+    p_base = p_norm + eef_pos
+    R_base = R_norm @ base2eef_mat
+    oMf_des = pin.SE3(R_base, p_base)
     nq = model.nq
     if q_init is None:
         q_init = pin.neutral(model)
@@ -141,21 +156,28 @@ def write_hdf5(path, dataset, data, create_mode="a"):
         f.create_dataset(dataset, data=np.asarray(data), dtype=data.dtype)
 
 
-def read_csv(path, dtype=np.float64):
-    return np.loadtxt(path, delimiter=",", dtype=dtype)
+def copy_hdf5_remaining(src_path, dst_path, exclude_dataset_paths):
+    """Copy all from src HDF5 to dst, skipping datasets whose path is in exclude_dataset_paths (e.g. '/state/end_pose/left')."""
+    import h5py
+    exclude = {p.lstrip("/") for p in exclude_dataset_paths}  # normalize to no leading slash for comparison
 
+    def path_str(parent_prefix, key):
+        return (parent_prefix + "/" + key) if parent_prefix else key
 
-def write_csv(path, data):
-    np.savetxt(path, np.asarray(data), delimiter=",")
-
-
-def infer_format(path):
-    p = path.lower()
-    if p.endswith(".hdf5") or p.endswith(".h5"):
-        return "hdf5"
-    if p.endswith(".csv"):
-        return "csv"
-    return "hdf5"
+    with h5py.File(src_path, "r") as f_in:
+        with h5py.File(dst_path, "w") as f_out:
+            def copy_recursive(parent_in, parent_out, prefix):
+                for key in parent_in:
+                    path = path_str(prefix, key)
+                    if path in exclude:
+                        continue
+                    item = parent_in[key]
+                    if isinstance(item, h5py.Dataset):
+                        parent_in.copy(item, parent_out, key)
+                    else:
+                        grp = parent_out.create_group(key)
+                        copy_recursive(item, grp, path)
+            copy_recursive(f_in, f_out, "")
 
 
 # -----------------------------------------------------------------------------
@@ -165,46 +187,108 @@ def main():
     ap = argparse.ArgumentParser(description="YAM/ARX joint_position <-> end_pose conversion")
     ap.add_argument("--arm", choices=["yam", "arx"], required=True)
     ap.add_argument("--mode", choices=["joint2pose", "pose2joint"], required=True)
-    ap.add_argument("--input", required=True, help="Input file (HDF5 or CSV)")
-    ap.add_argument("--output", required=True, help="Output file")
-    ap.add_argument("--format", choices=["hdf5", "csv"], default=None, help="Default: infer from extension")
+    ap.add_argument("--input", required=True, help="Input HDF5 file")
+    ap.add_argument("--output", required=True, help="Output HDF5 file")
+    ap.add_argument("--sides", choices=["left", "right", "both"], default="left",
+                    help="Arm(s) to convert: left/right/both (conventional dataset names)")
     ap.add_argument("--dataset-in", default=None, help="HDF5 input dataset (e.g. /state/joint_position/left)")
     ap.add_argument("--dataset-out", default=None, help="HDF5 output dataset")
+    ap.add_argument("--no-copy-remaining", action="store_true",
+                    help="Do not copy other data from input HDF5; write only converted dataset(s)")
     args = ap.parse_args()
+    copy_remaining = not args.no_copy_remaining
+    if copy_remaining and os.path.realpath(args.input) == os.path.realpath(args.output):
+        print("Warning: input and output are the same file; --copy-remaining disabled to avoid overwrite.", file=sys.stderr)
+        copy_remaining = False
 
-    fmt = args.format or infer_format(args.input)
-    if fmt != infer_format(args.output):
-        print("Warning: input and output format differ.", file=sys.stderr)
+    def dataset_pair(side, mode):
+        if mode == "joint2pose":
+            return f"/state/joint_position/{side}", f"/state/end_pose/{side}"
+        return f"/state/end_pose/{side}", f"/state/joint_position/{side}"
 
-    # Load
-    if fmt == "hdf5":
-        ds_in = args.dataset_in or "/state/joint_position/left" if args.mode == "joint2pose" else "/state/end_pose/left"
-        data_in = read_hdf5(args.input, ds_in)
-    else:
-        data_in = read_csv(args.input)
+    if args.sides == "both":
+        # Convert both arms in one run; conventional dataset names
+        try:
+            import h5py
+        except ImportError:
+            raise RuntimeError("h5py required for --sides both")
+        with h5py.File(args.input, "r") as f_in:
+            has_any = any(dataset_pair(s, args.mode)[0] in f_in for s in ("left", "right"))
+        if not has_any:
+            raise KeyError(f"No dataset /state/joint_position/left or /state/joint_position/right in {args.input}")
+        exclude_ds = {dataset_pair(s, args.mode)[1] for s in ("left", "right")}
+        if copy_remaining:
+            copy_hdf5_remaining(args.input, args.output, exclude_ds)
+            print(f"Copied remaining data from {args.input} to {args.output} (excluded {exclude_ds})")
+        sides_done = 0
+        yam_model = yam_data = yam_eef_id = None
+        if args.arm == "yam":
+            urdf = os.environ.get("YAM_URDF") or _yam_urdf_path()
+            yam_model, yam_data, yam_eef_id, yam_eef_pos, yam_base2eef = _yam_fk_model(urdf)
+        with h5py.File(args.input, "r") as f_in:
+            for side in ("left", "right"):
+                ds_in, ds_out = dataset_pair(side, args.mode)
+                if ds_in not in f_in:
+                    continue
+                data_in = np.array(f_in[ds_in])
+                if data_in.ndim == 1:
+                    data_in = data_in.reshape(1, -1)
+                if args.arm == "yam":
+                    if args.mode == "joint2pose":
+                        out_rows = [yam_joint_to_pose(row, yam_model, yam_data, yam_eef_id, yam_eef_pos, yam_base2eef) for row in data_in]
+                    else:
+                        q_prev = None
+                        out_rows = []
+                        for row in data_in:
+                            q = yam_pose_to_joint(row, yam_model, yam_data, yam_eef_id, yam_eef_pos, yam_base2eef, q_init=q_prev)
+                            q_prev = q
+                            out_rows.append(q)
+                else:
+                    if args.mode == "joint2pose":
+                        out_rows = [T_to_pose_xyzw(arx_fk(np.asarray(row).ravel()[:6])) for row in data_in]
+                    else:
+                        q_prev = None
+                        out_rows = []
+                        for row in data_in:
+                            T = pose_xyzw_to_T(np.asarray(row).ravel()[:7])
+                            q = arx_ik(T, q_init=q_prev)
+                            if q is None:
+                                q = q_prev if q_prev is not None else np.zeros(6)
+                            q_prev = q
+                            out_rows.append(q)
+                out = np.array(out_rows)
+                write_hdf5(args.output, ds_out, out, create_mode="a")
+                print(f"Wrote dataset '{ds_out}' to {args.output} shape {out.shape}")
+                sides_done += 1
+        return
+
+    # Single-side path
+    default_in = f"/state/joint_position/{args.sides}" if args.mode == "joint2pose" else f"/state/end_pose/{args.sides}"
+    default_out = f"/state/end_pose/{args.sides}" if args.mode == "joint2pose" else f"/state/joint_position/{args.sides}"
+    ds_in = args.dataset_in or default_in
+    ds_out = args.dataset_out or default_out
+    if copy_remaining:
+        copy_hdf5_remaining(args.input, args.output, {ds_out})
+        print(f"Copied remaining data from {args.input} to {args.output} (excluded {ds_out})")
+    data_in = read_hdf5(args.input, ds_in)
     if data_in.ndim == 1:
         data_in = data_in.reshape(1, -1)
 
-    # Convert
     if args.arm == "yam":
         urdf = os.environ.get("YAM_URDF") or _yam_urdf_path()
-        model, data, eef_id = _yam_fk_model(urdf)
+        model, data, eef_id, eef_pos, base2eef_mat = _yam_fk_model(urdf)
         if args.mode == "joint2pose":
-            out_rows = [yam_joint_to_pose(row, model, data, eef_id) for row in data_in]
+            out_rows = [yam_joint_to_pose(row, model, data, eef_id, eef_pos, base2eef_mat) for row in data_in]
         else:
             q_prev = None
             out_rows = []
             for row in data_in:
-                q = yam_pose_to_joint(row, model, data, eef_id, q_init=q_prev)
+                q = yam_pose_to_joint(row, model, data, eef_id, eef_pos, base2eef_mat, q_init=q_prev)
                 q_prev = q
                 out_rows.append(q)
     else:
         if args.mode == "joint2pose":
-            out_rows = []
-            for row in data_in:
-                q = np.asarray(row).ravel()[:6]
-                T = arx_fk(q)
-                out_rows.append(T_to_pose_xyzw(T))
+            out_rows = [T_to_pose_xyzw(arx_fk(np.asarray(row).ravel()[:6])) for row in data_in]
         else:
             q_prev = None
             out_rows = []
@@ -217,15 +301,8 @@ def main():
                 out_rows.append(q)
 
     out = np.array(out_rows)
-
-    # Save
-    if fmt == "hdf5":
-        ds_out = args.dataset_out or "/state/end_pose/left" if args.mode == "joint2pose" else "/state/joint_position/left"
-        write_hdf5(args.output, ds_out, out, create_mode="a" if os.path.isfile(args.output) else "w")
-        print(f"Wrote dataset '{ds_out}' to {args.output} shape {out.shape}")
-    else:
-        write_csv(args.output, out)
-        print(f"Wrote {args.output} shape {out.shape}")
+    write_hdf5(args.output, ds_out, out, create_mode="a" if copy_remaining or os.path.isfile(args.output) else "w")
+    print(f"Wrote dataset '{ds_out}' to {args.output} shape {out.shape}")
 
 
 if __name__ == "__main__":

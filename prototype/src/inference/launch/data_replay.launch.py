@@ -53,6 +53,12 @@ def generate_launch_description():
         description='Arm replay mode: joint (joint angle) or end_pose (end-effector pose, yam only)'
     )
 
+    replay_frequency_arg = DeclareLaunchArgument(
+        'replay_frequency',
+        default_value='0',
+        description='Replay rate in Hz (0 = use config collection_frequency). Lower e.g. 25 to reduce "Joint Delta Too Big"'
+    )
+
     # Create node
     replay_node = Node(
         package='inference',
@@ -65,6 +71,7 @@ def generate_launch_description():
             'loop': LaunchConfiguration('loop'),
             'arm_type': LaunchConfiguration('arm_type'),
             'arm_replay_mode': LaunchConfiguration('arm_replay_mode'),
+            'replay_frequency': LaunchConfiguration('replay_frequency'),
         }]
     )
 
@@ -74,5 +81,6 @@ def generate_launch_description():
         loop_arg,
         arm_type_arg,
         arm_replay_mode_arg,
+        replay_frequency_arg,
         replay_node,
     ])
