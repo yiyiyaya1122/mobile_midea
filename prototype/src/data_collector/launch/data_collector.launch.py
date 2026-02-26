@@ -22,8 +22,8 @@ def generate_launch_description():
         ),
         Node(
             package='data_collector',
-            executable='data_collector_node',
-            name='data_collector_node',
+            executable='data_collector_streaming_node',
+            name='data_collector_streaming_node',
             output='screen',
             parameters=[{
                 'config_path': LaunchConfiguration('config_path'),

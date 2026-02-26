@@ -1,7 +1,7 @@
 
 # data_dir 可以设置为具体路径，或使用 "auto" 自动创建日期目录
 # 如果设置为 "auto" 或空字符串，将在 base_dir 下创建当前日期目录 (格式: YYYYMMDD)
-data_dir: "auto"
+data_dir: "/home/r1lite/GalaxeaDataset"
 
 # base_dir: 当 data_dir 为 "auto" 时，数据将保存在此基础目录下的日期子目录中
 # 默认值: /media/Extreme SSD/DATA_COLLECT

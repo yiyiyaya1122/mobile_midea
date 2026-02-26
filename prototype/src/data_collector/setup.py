@@ -24,6 +24,7 @@ setup(
     entry_points={
         'console_scripts': [
             'data_collector_node = data_collector.data_collector_node:main',
+            'data_collector_streaming_node = data_collector.data_collector_streaming_node:main',
             'pedal_pub = data_collector.pedal:main',
         ],
     },

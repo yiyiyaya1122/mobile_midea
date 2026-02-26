@@ -4,6 +4,7 @@ import numpy as np
 import cv2
 from robot_msgs.msg import RobotCmd, RobotStatus, YamCmd, YamStatus, Quest2Button
 from geometry_msgs.msg import Twist
+from std_msgs.msg import Int32  
 
 class DataProcessor:
     def __init__(self, config: Dict[str, Any]):
@@ -24,19 +25,37 @@ class DataProcessor:
 
 
 class ImageProcessor(DataProcessor):
+    # 共享的 CvBridge 实例，避免每次调用都创建新实例导致内存泄漏
+    _bridge = None
+    
+    def __init__(self, config: Dict[str, Any]):
+        super().__init__(config)
+        # 使用类级别的单例 CvBridge
+        if ImageProcessor._bridge is None:
+            ImageProcessor._bridge = CvBridge()
+    
     def process(self, msg):
         """Process RGB images"""
-        img = CvBridge().imgmsg_to_cv2(msg, desired_encoding='rgb8')
+        img = ImageProcessor._bridge.imgmsg_to_cv2(msg, desired_encoding='rgb8')
         if self.config.get('resize'):
             img = cv2.resize(img, tuple(self.config['resize'][:2]))
         return img
 
 
 class DepthProcessor(DataProcessor):
+    # 共享的 CvBridge 实例，避免每次调用都创建新实例导致内存泄漏
+    _bridge = None
+    
+    def __init__(self, config: Dict[str, Any]):
+        super().__init__(config)
+        # 使用类级别的单例 CvBridge
+        if DepthProcessor._bridge is None:
+            DepthProcessor._bridge = CvBridge()
+    
     def process(self, msg):
         """Convert depth image message to numpy array"""
         # Convert to 16UC1 format (uint16) for depth preservation
-        depth_image = CvBridge().imgmsg_to_cv2(msg, desired_encoding='16UC1')
+        depth_image = DepthProcessor._bridge.imgmsg_to_cv2(msg, desired_encoding='16UC1')
 
         if self.config.get('resize'):
             depth_image = cv2.resize(depth_image,
@@ -167,4 +186,3 @@ class PedalProcessor(DataProcessor):
             return 'pedal stepped!!!'
         else:
             return ''
-        
