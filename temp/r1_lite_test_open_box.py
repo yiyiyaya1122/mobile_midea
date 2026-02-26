@@ -6,7 +6,7 @@ import sys
 import threading
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import Twist
-from robot_msgs.msg import MotorControl
+from hdas_msg.msg import MotorControl
 import time
 from std_msgs.msg import Bool
 from rclpy.duration import Duration
