@@ -119,7 +119,7 @@ class VRChassisTorsoControl(Node):
         # v_x: [-0.2, 0.2] m/s，但实际范围是 -0.1 ≤ x ≤ 0.2
         self.max_torso_vx = 0.1   # x方向最大速度
         # v_z: [-0.2, 0.2] m/s，但实际范围是 0.1 ≤ z ≤ 0.7（高度范围）
-        self.max_torso_vz = 0.15           # z方向最大速度
+        self.max_torso_vz = 0.12           # z方向最大速度
         self.max_pitch = 0.1              # pitch方向最大速度
 
         # Workspace 估计
@@ -179,7 +179,7 @@ class VRChassisTorsoControl(Node):
             return 0.0
         return (abs(v) - self.dead_zone) / (1.0 - self.dead_zone) * (1 if v > 0 else -1)
 
-    def expo(self, x, k=0.4):
+    def expo(self, x, k=0.0):
         return x * abs(x) * k + x * (1.0 - k)
 
     # =========================
