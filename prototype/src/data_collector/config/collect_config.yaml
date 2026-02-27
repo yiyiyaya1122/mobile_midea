@@ -1,10 +1,8 @@
 
 # data_dir 可以设置为具体路径，或使用 "auto" 自动创建日期目录
 # 如果设置为 "auto" 或空字符串，将在 base_dir 下创建当前日期目录 (格式: YYYYMMDD)
-data_dir: "/home/r1lite/GalaxeaDataset"
-
+data_dir: "auto"
 # base_dir: 当 data_dir 为 "auto" 时，数据将保存在此基础目录下的日期子目录中
-# 默认值: /media/Extreme SSD/DATA_COLLECT
 base_dir: "/media/Extreme SSD/DATA_COLLECT"
 
 max_queue_size: 5
@@ -123,38 +121,38 @@ datasets:
       description: "Torso velocity (angular xyz + linear xyz)"
 
   # Commanded robot end-effector pose (from VR, norm frame); same as target sent to YamController
-  "/state/end_pose/left":
-    topic: "/YAM_VR_L"
-    processor: "data_collector.data_processor.YamCmdEndPoseProcessor"
-    processor_config:
-      output_shape: [7]
-      dtype: "float64"
-      description: "Left arm commanded end-effector pose (x y z x y z w)"
+  # "/state/end_pose/left":
+  #   topic: "/YAM_VR_L"
+  #   processor: "data_collector.data_processor.YamCmdEndPoseProcessor"
+  #   processor_config:
+  #     output_shape: [7]
+  #     dtype: "float64"
+  #     description: "Left arm commanded end-effector pose (x y z x y z w)"
 
-  "/state/end_pose/right":
-    topic: "/YAM_VR_R"
-    processor: "data_collector.data_processor.YamCmdEndPoseProcessor"
-    processor_config:
-      output_shape: [7]
-      dtype: "float64"
-      description: "Right arm commanded end-effector pose (x y z x y z w)"
+  # "/state/end_pose/right":
+  #   topic: "/YAM_VR_R"
+  #   processor: "data_collector.data_processor.YamCmdEndPoseProcessor"
+  #   processor_config:
+  #     output_shape: [7]
+  #     dtype: "float64"
+  #     description: "Right arm commanded end-effector pose (x y z x y z w)"
 
   # Commanded gripper from YamCmd (same source as end_pose)
-  "/state/gripper_cmd/left":
-    topic: "/YAM_VR_L"
-    processor: "data_collector.data_processor.YamCmdGripperProcessor"
-    processor_config:
-      output_shape: [1]
-      dtype: "float64"
-      description: "Left arm commanded gripper from VR"
+  # "/state/gripper_cmd/left":
+  #   topic: "/YAM_VR_L"
+  #   processor: "data_collector.data_processor.YamCmdGripperProcessor"
+  #   processor_config:
+  #     output_shape: [1]
+  #     dtype: "float64"
+  #     description: "Left arm commanded gripper from VR"
 
-  "/state/gripper_cmd/right":
-    topic: "/YAM_VR_R"
-    processor: "data_collector.data_processor.YamCmdGripperProcessor"
-    processor_config:
-      output_shape: [1]
-      dtype: "float64"
-      description: "Right arm commanded gripper from VR"
+  # "/state/gripper_cmd/right":
+  #   topic: "/YAM_VR_R"
+  #   processor: "data_collector.data_processor.YamCmdGripperProcessor"
+  #   processor_config:
+  #     output_shape: [1]
+  #     dtype: "float64"
+  #     description: "Right arm commanded gripper from VR"
 
 
 topics:
@@ -215,10 +213,10 @@ topics:
     msg_type: "geometry_msgs.msg.TwistStamped"
     description: "Torso velocity"
 
-  "/YAM_VR_L":
-    msg_type: "robot_msgs.msg.YamCmd"
-    description: "Left arm command (commanded end-effector pose in norm frame)"
+  # "/YAM_VR_L":
+  #   msg_type: "robot_msgs.msg.YamCmd"
+  #   description: "Left arm command (commanded end-effector pose in norm frame)"
 
-  "/YAM_VR_R":
-    msg_type: "robot_msgs.msg.YamCmd"
-    description: "Right arm command (commanded end-effector pose in norm frame)"
+  # "/YAM_VR_R":
+  #   msg_type: "robot_msgs.msg.YamCmd"
+  #   description: "Right arm command (commanded end-effector pose in norm frame)"
