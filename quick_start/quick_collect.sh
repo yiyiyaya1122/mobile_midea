@@ -4,7 +4,7 @@
 set -e
 
 # ===================== 基本配置 =====================
-SESSION_NAME="r1lite_collect"
+SESSION_NAME="yam_collect"
 
 PASSWORD="1"
 
@@ -52,17 +52,13 @@ tmux split-window -v -t "$SESSION_NAME:robot.3"    # 右列再分割：1(右上)
 # 调整 pane 大小 - 使用 tiled 布局确保所有面板大小完全一致
 tmux select-layout -t "$SESSION_NAME:robot" tiled
 
-# ===================== CAN + galaxea_robot_startup pane =====================
+# # ===================== realsense d457 high camera pane =====================
 tmux send-keys -t "$SESSION_NAME:robot.0" "
 set +x
-tmux select-pane -T 'CAN'
-
-# 配置 Galaxea CAN 接口
-export PASSWORD='$PASSWORD'
-bash $PROTOTYPE_DIR/CAN/Galaxea/activate_galaxea_can.sh
-
-# 启动 galaxea_robot_startup.sh
-bash $QUICK_START_DIR/galaxea_robot_startup.sh
+tmux select-pane -T 'CAMERA'
+cd $PROTOTYPE_DIR || exit 1
+source install/setup.bash
+./scripts/d457_high.py
 
 exec bash
 " C-m
@@ -108,7 +104,7 @@ bash bash/adb.sh || exit 1
 
 # 启动 VR ROS2 节点
 source install/setup.bash
-pixi run ros2 launch quest3s_vr vr_control.launch.py
+pixi run ros2 run quest3s_vr controller_node
 
 exec bash
 " C-m

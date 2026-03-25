@@ -1,0 +1,223 @@
+
+# data_dir 可以设置为具体路径，或使用 "auto" 自动创建日期目录
+# 如果设置为 "auto" 或空字符串，将在 base_dir 下创建当前日期目录 (格式: YYYYMMDD)
+data_dir: "/home/midea/MideaDataset"
+
+# base_dir: 当 data_dir 为 "auto" 时，数据将保存在此基础目录下的日期子目录中
+# 默认值: /media/Extreme SSD/DATA_COLLECT
+base_dir: "/media/Extreme SSD/DATA_COLLECT"
+
+max_queue_size: 5
+max_age: 0.5
+collection_frequency: 50
+robot_number: 1
+datasets:
+  # "/subtask":
+  #   topic: "/pedal_status"
+  #   processor: "data_collector.data_processor.PedalProcessor"
+  #   processor_config:
+  #     output_shape: [1]
+  #     dtype: "int32"
+  #     description: "Pedal status converted to subtask ID: step=10, double step=100, normal=0"
+
+  "/observations/images/cam_right_wrist":
+    topic: "/cam_right_wrist/color/image_rect_raw"
+    processor: "data_collector.data_processor.ImageProcessor"
+    processor_config:
+      resize: [640, 480]
+      output_shape: [480, 640, 3]
+      dtype: "uint8"
+      description: "Right wrist camera image"
+
+  "/observations/images/cam_left_wrist":
+    topic: "/cam_left_wrist/color/image_rect_raw"
+    processor: "data_collector.data_processor.ImageProcessor"
+    processor_config:
+      resize: [640, 480]
+      output_shape: [480, 640, 3]
+      dtype: "uint8"
+      description: "Left wrist camera image"
+
+  # "/pointcloud_d457":
+  #   topic: "/cam_d457/depth/color/points"
+  #   processor: "data_collector.data_processor.PointcloudProcessor"
+  #   processor_config:
+  #     output_shape: [50000, 3]
+  #     dtype: "float16"
+  #     description: "Top-mounted D457 camera pointcloud"
+
+  "/observations/images/cam_high":
+    topic: "/cam_fish_top/color/image_rect_raw"
+    processor: "data_collector.data_processor.ImageProcessor"
+    processor_config:
+      resize: [640, 480]
+      output_shape: [480, 640, 3]
+      dtype: "uint8"
+      description: "Top-mounted D457 camera image"
+
+  # "/observations/images/cam_high":
+  #   topic: "/cam_high/color/image_rect_raw"
+  #   processor: "data_collector.data_processor.ImageProcessor"
+  #   processor_config:
+  #     resize: [640, 480]
+  #     output_shape: [480, 640, 3]
+  #     dtype: "uint8"
+  #     description: "Top-mounted camera image"
+
+  # "/observations/depth/cam_high":
+  #   topic: "/cam_l515/depth/image_rect_raw"
+  #   processor: "data_collector.data_processor.DepthProcessor"
+  #   processor_config:
+  #     resize: [640, 480]
+  #     output_shape: [480, 640]
+  #     dtype: "uint16"
+  #     description: "Top-mounted depth image"
+
+  "/state/joint_position/left":
+    topic: "/arm_l_status"
+    processor: "data_collector.data_processor.JointPositionProcessor"
+    processor_config:
+      output_shape: [7]
+      dtype: "float64"
+      description: "Left arm joint positions"
+
+  "/state/joint_position/right":
+    topic: "/arm_r_status"
+    processor: "data_collector.data_processor.JointPositionProcessor"
+    processor_config:
+      output_shape: [7]
+      dtype: "float64"
+      description: "Right arm joint positions"
+
+  "/state/joint_cur/left":
+    topic: "/arm_l_status"
+    processor: "data_collector.data_processor.JointCurrentProcessor"
+    processor_config:
+      output_shape: [7]
+      dtype: "float64"
+      description: "Right arm joint current"
+
+  "/state/joint_cur/right":
+    topic: "/arm_r_status"
+    processor: "data_collector.data_processor.JointCurrentProcessor"
+    processor_config:
+      output_shape: [7]
+      dtype: "float64"
+      description: "Right arm joint current"
+
+  "/state/chassis_vel":
+    topic: "/motion_target/target_speed_chassis"
+    processor: "data_collector.data_processor.OdomProcessor"
+    processor_config:
+      output_shape: [6]
+      dtype: "float64"
+      description: "Chassis velocity (angular xyz + linear xyz)"
+
+  "/state/torso_vel":
+    topic: "/motion_target/target_speed_torso"
+    processor: "data_collector.data_processor.TwistProcessor"
+    processor_config:
+      output_shape: [6]
+      dtype: "float64"
+      description: "Torso velocity (angular xyz + linear xyz)"
+
+  # Commanded robot end-effector pose (from VR, norm frame); same as target sent to YamController
+  "/state/end_pose/left":
+    topic: "/YAM_VR_L"
+    processor: "data_collector.data_processor.YamCmdEndPoseProcessor"
+    processor_config:
+      output_shape: [7]
+      dtype: "float64"
+      description: "Left arm commanded end-effector pose (x y z x y z w)"
+
+  "/state/end_pose/right":
+    topic: "/YAM_VR_R"
+    processor: "data_collector.data_processor.YamCmdEndPoseProcessor"
+    processor_config:
+      output_shape: [7]
+      dtype: "float64"
+      description: "Right arm commanded end-effector pose (x y z x y z w)"
+
+  # Commanded gripper from YamCmd (same source as end_pose)
+  "/state/gripper_cmd/left":
+    topic: "/YAM_VR_L"
+    processor: "data_collector.data_processor.YamCmdGripperProcessor"
+    processor_config:
+      output_shape: [1]
+      dtype: "float64"
+      description: "Left arm commanded gripper from VR"
+
+  "/state/gripper_cmd/right":
+    topic: "/YAM_VR_R"
+    processor: "data_collector.data_processor.YamCmdGripperProcessor"
+    processor_config:
+      output_shape: [1]
+      dtype: "float64"
+      description: "Right arm commanded gripper from VR"
+
+
+topics:
+
+  # "/pedal_status":
+  #   msg_type: "sensor_msgs.msg.Joy"
+  #   description: "Pedal input device"
+
+  "/cam_right_wrist/color/image_rect_raw":
+    msg_type: "sensor_msgs.msg.Image"
+    description: "Right wrist camera"
+
+  "/cam_left_wrist/color/image_rect_raw":
+    msg_type: "sensor_msgs.msg.Image"
+    description: "Left wrist camera"
+
+  # "/cam_front/color/image_rect_raw":
+  #   msg_type: "sensor_msgs.msg.Image"
+  #   description: "Front camera between arms"
+
+  # "/cam_high/color/image_rect_raw":
+  #   msg_type: "sensor_msgs.msg.Image"
+  #   description: "high camera"
+
+  "/cam_fish_top/color/image_rect_raw":
+    msg_type: "sensor_msgs.msg.Image"
+    description: "high camera"
+
+  # "/cam_l515/color/image_raw":
+  #   msg_type: "sensor_msgs.msg.Image"
+  #   description: "Top-mounted L515 camera"
+
+  # "/cam_l515/depth/image_rect_raw":
+  #   msg_type: "sensor_msgs.msg.Image"
+  #   description: "Top-mounted L515 depth image"
+
+  # "/cam_d457/color/image_raw":
+  #   msg_type: "sensor_msgs.msg.Image"
+  #   description: "Top-mounted D457 camera"
+
+  # "/cam_d457/depth/color/points":
+  #   msg_type: "sensor_msgs.msg.PointCloud2"
+  #   description: "Top-mounted D457 pointcloud"
+
+  "/arm_l_status":
+    msg_type: "robot_msgs.msg.YamStatus"
+    description: "Left arm status"
+
+  "/arm_r_status":
+    msg_type: "robot_msgs.msg.YamStatus"
+    description: "Right arm status"
+
+  "/motion_target/target_speed_chassis":
+    msg_type: "geometry_msgs.msg.TwistStamped"
+    description: "Chassis velocity"
+
+  "/motion_target/target_speed_torso":
+    msg_type: "geometry_msgs.msg.TwistStamped"
+    description: "Torso velocity"
+
+  "/YAM_VR_L":
+    msg_type: "robot_msgs.msg.YamCmd"
+    description: "Left arm command (commanded end-effector pose in norm frame)"
+
+  "/YAM_VR_R":
+    msg_type: "robot_msgs.msg.YamCmd"
+    description: "Right arm command (commanded end-effector pose in norm frame)"
